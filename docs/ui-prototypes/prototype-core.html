@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI 闯关学习小程序核心原型</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      --paper: #fff8df;
+      --paper-deep: #f6e8ba;
+      --ink: #171717;
+      --muted: #746c5d;
+      --yellow: #ffd84d;
+      --yellow-deep: #ffbb1f;
+      --red: #ff5a4d;
+      --red-soft: #ffe0dc;
+      --green: #1fc79a;
+      --green-soft: #d7f8ed;
+      --blue: #55b7ff;
+      --blue-soft: #dff1ff;
+      --shadow: rgba(23, 23, 23, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Comic Sans MS", "LXGW WenKai", "Kaiti SC", "Microsoft YaHei", system-ui, sans-serif;
+      background:
+        linear-gradient(rgba(84, 122, 164, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(84, 122, 164, 0.06) 1px, transparent 1px),
+        radial-gradient(circle at 12% 8%, rgba(255, 216, 77, 0.48), transparent 20rem),
+        radial-gradient(circle at 88% 18%, rgba(85, 183, 255, 0.32), transparent 18rem),
+        var(--paper);
+      background-size: 28px 28px, 28px 28px, auto, auto, auto;
+    }
+
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 34px 22px 64px;
+    }
+
+    .cover {
+      position: relative;
+      min-height: 190px;
+      border: 4px solid var(--ink);
+      border-radius: 28px 24px 30px 22px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.14)),
+        repeating-linear-gradient(0deg, transparent 0 25px, rgba(53, 80, 116, 0.08) 26px 27px);
+      box-shadow: 10px 10px 0 var(--ink);
+      padding: 26px 28px;
+      overflow: hidden;
+    }
+
+    .cover::after {
+      content: "";
+      position: absolute;
+      right: 28px;
+      top: 24px;
+      width: 150px;
+      height: 120px;
+      background:
+        radial-gradient(circle at 50% 45%, transparent 45px, var(--ink) 47px 50px, transparent 52px),
+        linear-gradient(35deg, transparent 42%, var(--ink) 43% 46%, transparent 47%),
+        linear-gradient(-35deg, transparent 42%, var(--ink) 43% 46%, transparent 47%);
+      opacity: 0.18;
+      transform: rotate(9deg);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 13px;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      background: var(--yellow);
+      font-size: 14px;
+      font-weight: 900;
+      transform: rotate(-2deg);
+      box-shadow: 4px 4px 0 var(--ink);
+    }
+
+    h1 {
+      margin: 24px 0 12px;
+      font-size: clamp(34px, 6vw, 62px);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .cover p {
+      max-width: 740px;
+      margin: 0;
+      color: #3f372b;
+      font-size: 18px;
+      line-height: 1.7;
+      font-weight: 700;
+    }
+
+    .flow-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 24px 0 34px;
+      padding-left: 4px;
+    }
+
+    .flow-step {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 13px;
+      border: 3px solid var(--ink);
+      border-radius: 13px 16px 12px 18px;
+      background: #fffef5;
+      font-weight: 900;
+      box-shadow: 4px 4px 0 var(--ink);
+      transform: rotate(var(--tilt, -1deg));
+    }
+
+    .flow-step:nth-child(2) { --tilt: 1deg; }
+    .flow-step:nth-child(3) { --tilt: -1.4deg; }
+    .flow-step:nth-child(4) { --tilt: 1.3deg; }
+
+    .flow-step b {
+      display: grid;
+      width: 24px;
+      height: 24px;
+      place-items: center;
+      border: 2px solid var(--ink);
+      border-radius: 50%;
+      background: var(--red);
+      color: #fff;
+      font-size: 13px;
+    }
+
+    .board-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 28px;
+      align-items: start;
+    }
+
+    .phone-wrap {
+      min-width: 0;
+    }
+
+    .screen-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 0 12px;
+      padding: 0 4px;
+      font-weight: 900;
+    }
+
+    .screen-label span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 18px;
+    }
+
+    .screen-label em {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .phone {
+      position: relative;
+      width: min(100%, 390px);
+      min-height: 760px;
+      margin: 0 auto;
+      border: 5px solid var(--ink);
+      border-radius: 38px;
+      background: #fffdf1;
+      box-shadow: 10px 12px 0 var(--ink), 0 16px 36px var(--shadow);
+      overflow: hidden;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      width: 76px;
+      height: 18px;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      background: #2b2b2b;
+      transform: translateX(-50%);
+      z-index: 5;
+    }
+
+    .screen {
+      min-height: 760px;
+      padding: 46px 20px 24px;
+      background:
+        linear-gradient(rgba(59, 113, 185, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59, 113, 185, 0.035) 1px, transparent 1px),
+        var(--paper);
+      background-size: 22px 22px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: 3px 3px 0 var(--ink);
+      white-space: nowrap;
+    }
+
+    .badge.yellow { background: var(--yellow); }
+    .badge.green { background: var(--green-soft); }
+    .badge.red { background: var(--red-soft); }
+    .badge.blue { background: var(--blue-soft); }
+
+    .hero-title {
+      margin: 0 0 10px;
+      font-size: 30px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .subcopy {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+      font-weight: 800;
+    }
+
+    .comic-panel {
+      position: relative;
+      border: 4px solid var(--ink);
+      border-radius: 24px 18px 26px 16px;
+      background: #fffef8;
+      padding: 16px;
+      box-shadow: 6px 6px 0 var(--ink);
+    }
+
+    .comic-panel + .comic-panel {
+      margin-top: 16px;
+    }
+
+    .comic-panel.tilt-left {
+      transform: rotate(-1.2deg);
+    }
+
+    .comic-panel.tilt-right {
+      transform: rotate(1deg);
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .fake-input,
+    .fake-textarea {
+      width: 100%;
+      border: 3px solid var(--ink);
+      border-radius: 16px 14px 18px 12px;
+      background: #fff;
+      padding: 13px 14px;
+      font-size: 15px;
+      line-height: 1.5;
+      font-weight: 900;
+      box-shadow: inset 3px 3px 0 rgba(0, 0, 0, 0.06);
+    }
+
+    .fake-textarea {
+      min-height: 100px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 48px;
+      border: 4px solid var(--ink);
+      border-radius: 18px 14px 20px 15px;
+      background: var(--yellow);
+      color: var(--ink);
+      font-size: 16px;
+      font-weight: 1000;
+      box-shadow: 5px 5px 0 var(--ink);
+      text-align: center;
+    }
+
+    .button.secondary {
+      width: auto;
+      min-height: 38px;
+      padding: 0 12px;
+      border-width: 3px;
+      background: #fff;
+      box-shadow: 3px 3px 0 var(--ink);
+      font-size: 13px;
+    }
+
+    .button.green {
+      background: var(--green);
+      color: #06291f;
+    }
+
+    .button.red {
+      background: var(--red);
+      color: #fff;
+    }
+
+    .api-card {
+      margin-top: 14px;
+      padding: 13px;
+      border: 3px dashed var(--ink);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.62);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border: 5px solid rgba(23, 23, 23, 0.16);
+      border-top-color: var(--ink);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .question-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .question-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 10px;
+      border: 3px solid var(--ink);
+      border-radius: 13px;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      min-width: 0;
+    }
+
+    .question-chip b {
+      display: grid;
+      flex: 0 0 24px;
+      width: 24px;
+      height: 24px;
+      place-items: center;
+      border: 2px solid var(--ink);
+      border-radius: 50%;
+      background: var(--blue-soft);
+      font-size: 12px;
+    }
+
+    .question-chip span {
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .progress {
+      height: 18px;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      background: #fff;
+      overflow: hidden;
+      box-shadow: inset 3px 3px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    .progress > i {
+      display: block;
+      height: 100%;
+      width: var(--value, 40%);
+      background: repeating-linear-gradient(-45deg, var(--green) 0 10px, #5fe4bf 10px 18px);
+      border-right: 3px solid var(--ink);
+    }
+
+    .question-title {
+      margin: 14px 0 18px;
+      font-size: 23px;
+      line-height: 1.32;
+      letter-spacing: 0;
+    }
+
+    .option-list {
+      display: grid;
+      gap: 12px;
+      margin: 18px 0;
+    }
+
+    .option {
+      position: relative;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 13px 12px;
+      border: 3px solid var(--ink);
+      border-radius: 18px 13px 19px 15px;
+      background: #fff;
+      box-shadow: 4px 4px 0 var(--ink);
+      font-size: 14px;
+      line-height: 1.45;
+      font-weight: 900;
+    }
+
+    .option b {
+      display: grid;
+      flex: 0 0 28px;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border: 2px solid var(--ink);
+      border-radius: 50%;
+      background: var(--yellow);
+      line-height: 1;
+    }
+
+    .option.correct {
+      background: var(--green-soft);
+      transform: rotate(-0.4deg);
+    }
+
+    .option.wrong {
+      background: var(--red-soft);
+      transform: rotate(0.6deg);
+    }
+
+    .option.correct::after,
+    .option.wrong::after {
+      position: absolute;
+      right: 10px;
+      top: -13px;
+      padding: 4px 9px;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      box-shadow: 2px 2px 0 var(--ink);
+      font-size: 12px;
+      font-weight: 1000;
+    }
+
+    .option.correct::after {
+      content: "答对啦";
+      background: var(--green);
+    }
+
+    .option.wrong::after {
+      content: "踩坑";
+      background: var(--red);
+      color: #fff;
+    }
+
+    .burst {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 98px;
+      min-height: 46px;
+      padding: 8px 13px;
+      background: var(--red);
+      color: #fff;
+      border: 4px solid var(--ink);
+      font-weight: 1000;
+      clip-path: polygon(8% 15%, 22% 21%, 28% 3%, 42% 19%, 55% 5%, 62% 24%, 80% 14%, 75% 36%, 95% 45%, 76% 56%, 88% 77%, 63% 72%, 56% 96%, 43% 75%, 26% 89%, 25% 66%, 4% 74%, 16% 52%, 0 40%, 18% 33%);
+      transform: rotate(-5deg);
+    }
+
+    .explain {
+      margin-top: 16px;
+      padding: 14px;
+      border: 4px solid var(--ink);
+      border-radius: 18px 24px 16px 22px;
+      background: var(--yellow);
+      box-shadow: 5px 5px 0 var(--ink);
+    }
+
+    .explain h3,
+    .report-section h3 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      line-height: 1.2;
+    }
+
+    .explain p,
+    .report-section p {
+      margin: 0;
+      color: #332b1f;
+      font-size: 14px;
+      line-height: 1.55;
+      font-weight: 800;
+    }
+
+    .score-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .score-item {
+      min-height: 92px;
+      padding: 12px;
+      border: 4px solid var(--ink);
+      border-radius: 20px 15px 22px 14px;
+      background: #fff;
+      box-shadow: 5px 5px 0 var(--ink);
+    }
+
+    .score-item strong {
+      display: block;
+      font-size: 30px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .score-item span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 1000;
+    }
+
+    .report-section {
+      margin-top: 14px;
+      padding: 13px;
+      border: 3px solid var(--ink);
+      border-radius: 18px 13px 20px 14px;
+      background: #fffef8;
+    }
+
+    .report-section.warn {
+      background: var(--red-soft);
+    }
+
+    .report-section.good {
+      background: var(--green-soft);
+    }
+
+    .bullet-list {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      color: #332b1f;
+      font-size: 13px;
+      line-height: 1.55;
+      font-weight: 800;
+    }
+
+    .footer-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .footer-actions .button {
+      flex: 1;
+      width: auto;
+      min-height: 44px;
+      font-size: 14px;
+    }
+
+    .sparkline {
+      display: flex;
+      align-items: end;
+      gap: 5px;
+      height: 62px;
+      margin-top: 8px;
+    }
+
+    .sparkline i {
+      flex: 1;
+      min-width: 0;
+      border: 3px solid var(--ink);
+      border-radius: 8px 8px 0 0;
+      background: var(--blue);
+      height: var(--h);
+    }
+
+    .sticker-stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin: 14px 0;
+    }
+
+    .topic-sticker {
+      padding: 7px 10px;
+      border: 3px solid var(--ink);
+      border-radius: 14px 10px 16px 12px;
+      background: #fff;
+      box-shadow: 3px 3px 0 var(--ink);
+      font-size: 13px;
+      font-weight: 1000;
+      transform: rotate(var(--tilt, -1deg));
+    }
+
+    .topic-sticker:nth-child(2) { --tilt: 1.6deg; background: var(--blue-soft); }
+    .topic-sticker:nth-child(3) { --tilt: -2deg; background: var(--green-soft); }
+    .topic-sticker:nth-child(4) { --tilt: 1deg; background: var(--red-soft); }
+
+    .note {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    @media (max-width: 1180px) {
+      .board-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 780px) {
+      .page {
+        padding: 20px 14px 42px;
+      }
+
+      .cover {
+        padding: 20px;
+        box-shadow: 6px 6px 0 var(--ink);
+      }
+
+      .board-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+
+      .phone {
+        max-width: 390px;
+      }
+
+      .screen-label {
+        max-width: 390px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="cover">
+      <span class="eyebrow">AI 闯关学习 · 核心 HTML 原型</span>
+      <h1>把知识点扔进课堂，<br />让 AI 出题开闯。</h1>
+      <p>这版只覆盖 MVP 主链路：生成题库接口、闯关答题、报告接口、首页闭环。视觉采用校园漫画感，但不复刻任何现有漫画角色或受保护画面。</p>
+    </section>
+
+    <nav class="flow-strip" aria-label="MVP flow">
+      <span class="flow-step"><b>1</b> 题库接口</span>
+      <span class="flow-step"><b>2</b> 闯关页面</span>
+      <span class="flow-step"><b>3</b> 报告接口</span>
+      <span class="flow-step"><b>4</b> 首页闭环</span>
+    </nav>
+
+    <section class="board-grid">
+      <article class="phone-wrap">
+        <div class="screen-label">
+          <span>01 生成题库接口态</span>
+          <em>Backend first</em>
+        </div>
+        <div class="phone">
+          <div class="screen">
+            <div class="topbar">
+              <span class="badge yellow">Step 1</span>
+              <span class="badge blue">POST /api/generate-quiz</span>
+            </div>
+            <h2 class="hero-title">先把题库接口<br />跑通！</h2>
+            <p class="subcopy">不急着做首页，先验证 AI 能不能稳定生成 5 道题。</p>
+
+            <div class="comic-panel tilt-left">
+              <label class="field-label">学习主题</label>
+              <div class="fake-input">AI Agent 是什么？</div>
+              <div class="api-card">
+                {<br />
+                &nbsp;&nbsp;"input": { "type": "topic", "content": "AI Agent 是什么？" }<br />
+                }
+              </div>
+            </div>
+
+            <div class="status-row">
+              <span class="spinner" aria-hidden="true"></span>
+              <strong>LangChain 正在出题...</strong>
+            </div>
+
+            <div class="comic-panel">
+              <span class="badge green">结构预览</span>
+              <div class="question-list">
+                <div class="question-chip"><b>1</b><span>Agent 和普通聊天机器人区别</span></div>
+                <div class="question-chip"><b>2</b><span>工具调用是怎么发生的</span></div>
+                <div class="question-chip"><b>3</b><span>规划能力有什么用</span></div>
+                <div class="question-chip"><b>4</b><span>记忆模块解决什么问题</span></div>
+                <div class="question-chip"><b>5</b><span>什么时候不该用 Agent</span></div>
+              </div>
+            </div>
+
+            <p class="note">接口合格标准：5 题、单选、答案唯一、讲解非空。</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="phone-wrap">
+        <div class="screen-label">
+          <span>02 闯关未答态</span>
+          <em>Question 2/5</em>
+        </div>
+        <div class="phone">
+          <div class="screen">
+            <div class="topbar">
+              <span class="badge green">第 2 / 5 题</span>
+              <span class="badge yellow">糗学值 +12</span>
+            </div>
+            <div class="progress" aria-label="进度 40%">
+              <i style="--value: 40%"></i>
+            </div>
+
+            <div class="comic-panel tilt-right">
+              <span class="badge blue">知识点：工具调用</span>
+              <h2 class="question-title">下面哪句话最能说明 AI Agent 和普通聊天机器人的区别？</h2>
+              <div class="option-list">
+                <div class="option"><b>A</b><span>Agent 只能回答固定题库里的问题。</span></div>
+                <div class="option"><b>B</b><span>Agent 可以根据目标规划步骤，并调用工具完成任务。</span></div>
+                <div class="option"><b>C</b><span>Agent 一定比所有应用都更准确。</span></div>
+                <div class="option"><b>D</b><span>Agent 只是一种更长的提示词。</span></div>
+              </div>
+              <div class="button">选好了，冲！</div>
+            </div>
+
+            <div class="sticker-stack">
+              <span class="topic-sticker">别慌，先读题</span>
+              <span class="topic-sticker">选项会坑人</span>
+              <span class="topic-sticker">答完立刻讲解</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="phone-wrap">
+        <div class="screen-label">
+          <span>03 答错 / 解析态</span>
+          <em>Feedback</em>
+        </div>
+        <div class="phone">
+          <div class="screen">
+            <div class="topbar">
+              <span class="badge red">第 2 题解析</span>
+              <span class="burst">踩坑啦</span>
+            </div>
+            <div class="progress" aria-label="进度 40%">
+              <i style="--value: 40%"></i>
+            </div>
+
+            <div class="comic-panel">
+              <h2 class="question-title">AI Agent 和普通聊天机器人的区别？</h2>
+              <div class="option-list">
+                <div class="option wrong"><b>D</b><span>Agent 只是一种更长的提示词。</span></div>
+                <div class="option correct"><b>B</b><span>Agent 可以根据目标规划步骤，并调用工具完成任务。</span></div>
+              </div>
+              <div class="explain">
+                <h3>老师拍黑板：重点在“行动能力”</h3>
+                <p>普通聊天机器人主要生成回答；Agent 更像会安排步骤的小助手，可以规划、调用工具、观察结果，再继续下一步。</p>
+              </div>
+            </div>
+
+            <div class="footer-actions">
+              <div class="button secondary">记到错题</div>
+              <div class="button green">下一题</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="phone-wrap">
+        <div class="screen-label">
+          <span>04 报告生成接口态</span>
+          <em>Report API</em>
+        </div>
+        <div class="phone">
+          <div class="screen">
+            <div class="topbar">
+              <span class="badge blue">Step 3</span>
+              <span class="badge yellow">POST /api/generate-report</span>
+            </div>
+            <h2 class="hero-title">答完啦，<br />该复盘了。</h2>
+            <p class="subcopy">前端把真实答题结果交给报告接口，AI 只负责总结，不负责乱编分数。</p>
+
+            <div class="score-box">
+              <div class="score-item">
+                <strong>4/5</strong>
+                <span>答对题数</span>
+              </div>
+              <div class="score-item">
+                <strong>80%</strong>
+                <span>正确率</span>
+              </div>
+            </div>
+
+            <div class="comic-panel">
+              <span class="badge red">错题包</span>
+              <div class="api-card">
+                answers: [ q1✓, q2×, q3✓, q4✓, q5✓ ]<br />
+                wrongQuestionReview: q2<br />
+                score: 程序计算，不交给 AI 猜
+              </div>
+              <div class="status-row">
+                <span class="spinner" aria-hidden="true"></span>
+                <strong>AI 正在写复盘小纸条...</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="phone-wrap">
+        <div class="screen-label">
+          <span>05 复盘报告态</span>
+          <em>Result</em>
+        </div>
+        <div class="phone">
+          <div class="screen">
+            <div class="topbar">
+              <span class="badge green">通关报告</span>
+              <span class="badge yellow">AI Agent</span>
+            </div>
+            <h2 class="hero-title">这回没白学，<br />你掌握 80%。</h2>
+
+            <div class="score-box">
+              <div class="score-item" style="background: var(--green-soft);">
+                <strong>80</strong>
+                <span>本轮得分</span>
+              </div>
+              <div class="score-item" style="background: var(--yellow);">
+                <strong>1</strong>
+                <span>需要复习</span>
+              </div>
+            </div>
+
+            <div class="report-section good">
+              <h3>核心知识点</h3>
+              <p>Agent 的关键不是“会聊天”，而是能围绕目标规划步骤、调用工具、观察结果。</p>
+            </div>
+
+            <div class="report-section warn">
+              <h3>薄弱点：工具调用</h3>
+              <p>你把 Agent 理解成“更长提示词”，需要补一下工具调用和任务规划。</p>
+            </div>
+
+            <div class="report-section">
+              <h3>下一步建议</h3>
+              <ul class="bullet-list">
+                <li>复习 Agent、Workflow、Chatbot 的区别。</li>
+                <li>再挑战一次“工具调用”专项题。</li>
+                <li>尝试输入你自己的工作场景。</li>
+              </ul>
+            </div>
+
+            <div class="footer-actions">
+              <div class="button secondary">再来一局</div>
+              <div class="button">分享战绩</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="phone-wrap">
+        <div class="screen-label">
+          <span>06 首页接入闭环态</span>
+          <em>Entry last</em>
+        </div>
+        <div class="phone">
+          <div class="screen">
+            <div class="topbar">
+              <span class="badge yellow">最后接首页</span>
+              <span class="badge green">端到端闭环</span>
+            </div>
+            <h2 class="hero-title">今天想把<br />哪个知识点打趴？</h2>
+            <p class="subcopy">输入主题，AI 出题。答错也不丢人，讲解会把坑填上。</p>
+
+            <div class="comic-panel tilt-left">
+              <label class="field-label">把知识扔进来</label>
+              <div class="fake-textarea">比如：请用 5 道题帮我理解“Python 装饰器”</div>
+            </div>
+
+            <div class="sticker-stack">
+              <span class="topic-sticker">JavaScript 闭包</span>
+              <span class="topic-sticker">基金定投</span>
+              <span class="topic-sticker">英语完成时</span>
+              <span class="topic-sticker">面试八股</span>
+            </div>
+
+            <div class="button">生成闯关题</div>
+
+            <div class="comic-panel" style="margin-top: 18px;">
+              <span class="badge blue">闭环路径</span>
+              <div class="sparkline" aria-label="闭环步骤图">
+                <i style="--h: 28px"></i>
+                <i style="--h: 44px"></i>
+                <i style="--h: 55px"></i>
+                <i style="--h: 38px"></i>
+                <i style="--h: 62px"></i>
+              </div>
+              <p class="subcopy" style="margin: 10px 0 0;">首页输入 -> 题库接口 -> 闯关页 -> 报告接口 -> 复盘页</p>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
