@@ -93,4 +93,5 @@ class GenerateReportResponse(BaseModel):
 
 
 class AiGenerationError(BaseModel):
+    code: str
     detail: str

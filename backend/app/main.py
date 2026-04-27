@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from functools import lru_cache
 
-from .config import Settings, get_settings
+from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from .config import get_settings
 from .llm import LangChainAiClient
 from .schemas import (
     AiGenerationError,
@@ -13,6 +16,14 @@ from .schemas import (
     GenerateReportResponse,
 )
 from .services import AiServiceError, LearningService
+
+
+class AiHttpError(RuntimeError):
+    def __init__(self, status_code: int, code: str, detail: str):
+        super().__init__(detail)
+        self.status_code = status_code
+        self.code = code
+        self.detail = detail
 
 
 def create_app() -> FastAPI:
@@ -26,6 +37,11 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(AiHttpError)
+    async def handle_ai_http_error(_: Request, exc: AiHttpError) -> JSONResponse:
+        payload = AiGenerationError(code=exc.code, detail=exc.detail)
+        return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -43,7 +59,7 @@ def create_app() -> FastAPI:
         try:
             return service.generate_quiz(payload.inputText)
         except AiServiceError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            raise AiHttpError(status_code=502, code=exc.code, detail=exc.detail) from exc
 
     @app.post(
         "/api/generate-report",
@@ -57,16 +73,23 @@ def create_app() -> FastAPI:
         try:
             return service.generate_report(payload)
         except AiServiceError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            raise AiHttpError(status_code=502, code=exc.code, detail=exc.detail) from exc
 
     return app
 
 
-def get_learning_service(settings: Settings = Depends(get_settings)) -> LearningService:
+@lru_cache
+def get_ai_client() -> LangChainAiClient:
     try:
-        return LearningService(ai_client=LangChainAiClient(settings))
+        return LangChainAiClient(get_settings())
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise AiHttpError(status_code=502, code="ai_auth_error", detail=str(exc)) from exc
+
+
+def get_learning_service(
+    ai_client: LangChainAiClient = Depends(get_ai_client),
+) -> LearningService:
+    return LearningService(ai_client=ai_client)
 
 
 app = create_app()

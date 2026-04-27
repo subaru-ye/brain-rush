@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from .llm import AiQuizDraft, AiReportDraft
+from .llm import AiClientError, AiQuizDraft, AiReportDraft
 from .schemas import (
     GenerateQuizResponse,
     GenerateReportRequest,
@@ -33,7 +33,10 @@ class AiClient(Protocol):
 
 
 class AiServiceError(RuntimeError):
-    pass
+    def __init__(self, code: str, detail: str):
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
 
 
 @dataclass
@@ -48,14 +51,21 @@ class LearningService:
                 topic=draft.topic.strip(),
                 questions=draft.questions,
             )
+        except AiClientError as exc:
+            raise AiServiceError(exc.code, exc.detail) from exc
         except (ValidationError, ValueError) as exc:
-            raise AiServiceError("AI 返回的题目结构不合法，请稍后重试") from exc
+            raise AiServiceError("ai_invalid_response", "AI 返回的题目结构不合法，请稍后重试") from exc
         except Exception as exc:
-            raise AiServiceError(f"AI 题目生成失败：{exc}") from exc
+            raise AiServiceError("ai_upstream_error", "AI 题目生成失败，请稍后重试") from exc
 
     def generate_report(self, request: GenerateReportRequest) -> GenerateReportResponse:
         total = len(request.answers)
-        correct_count = sum(1 for answer in request.answers if answer.isCorrect)
+        question_by_id = {question.id: question for question in request.questions}
+        correct_count = sum(
+            1
+            for answer in request.answers
+            if self._is_answer_correct(question_by_id[answer.questionId], answer)
+        )
         accuracy = round(correct_count / total * 100) if total else 0
         score = accuracy
 
@@ -66,29 +76,39 @@ class LearningService:
                 answers=request.answers,
                 accuracy=accuracy,
             )
+        except AiClientError as exc:
+            raise AiServiceError(exc.code, exc.detail) from exc
         except (ValidationError, ValueError) as exc:
-            raise AiServiceError("AI 返回的复盘报告结构不合法，请稍后重试") from exc
+            raise AiServiceError("ai_invalid_response", "AI 返回的复盘报告结构不合法，请稍后重试") from exc
         except Exception as exc:
-            raise AiServiceError(f"AI 复盘报告生成失败：{exc}") from exc
+            raise AiServiceError("ai_upstream_error", "AI 复盘报告生成失败，请稍后重试") from exc
 
         report = ReviewReport(
             score=score,
             accuracy=accuracy,
             summary=draft.summary,
             weakPoints=draft.weakPoints,
-            wrongQuestions=self._build_wrong_question_reviews(request),
+            wrongQuestions=self._build_wrong_question_reviews(request, question_by_id),
             suggestions=draft.suggestions,
         )
         return GenerateReportResponse(report=report)
 
     @staticmethod
-    def _build_wrong_question_reviews(request: GenerateReportRequest) -> list[WrongQuestionReview]:
+    def _is_answer_correct(question: QuizQuestion, answer: UserAnswer) -> bool:
+        return answer.selectedIndex == question.answerIndex
+
+    @classmethod
+    def _build_wrong_question_reviews(
+        cls,
+        request: GenerateReportRequest,
+        question_by_id: dict[str, QuizQuestion],
+    ) -> list[WrongQuestionReview]:
         answer_by_question = {answer.questionId: answer for answer in request.answers}
         wrong_reviews: list[WrongQuestionReview] = []
 
         for question in request.questions:
             answer = answer_by_question.get(question.id)
-            if not answer or answer.isCorrect:
+            if not answer or cls._is_answer_correct(question_by_id[question.id], answer):
                 continue
             selected = question.options[answer.selectedIndex]
             correct = question.options[question.answerIndex]

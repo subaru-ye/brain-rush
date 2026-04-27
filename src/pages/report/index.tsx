@@ -50,6 +50,14 @@ export default function ReportPage() {
     Taro.redirectTo({ url: "/pages/index/index" })
   }
 
+  function getCorrectCount(nextSession: QuizSession) {
+    const questionById = new Map(nextSession.questions.map((question) => [question.id, question]))
+    return nextSession.answers.filter((answer) => {
+      const question = questionById.get(answer.questionId)
+      return question ? answer.selectedIndex === question.answerIndex : false
+    }).length
+  }
+
   if (!session) {
     return (
       <View className='screen center-screen'>
@@ -59,7 +67,7 @@ export default function ReportPage() {
   }
 
   if (loading) {
-    const correctCount = session.answers.filter((answer) => answer.isCorrect).length
+    const correctCount = getCorrectCount(session)
     const accuracy = Math.round((correctCount / session.questions.length) * 100)
     return (
       <View className='screen'>

@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TypeVar
+from typing import Any, TypeVar
 
-from pydantic import BaseModel, Field
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+    RateLimitError,
+)
+from pydantic import BaseModel, Field, ValidationError
 
 from .config import Settings
+from .prompts import build_quiz_prompt, build_report_prompt
 from .schemas import QuizQuestion, UserAnswer
 
 
@@ -21,6 +28,13 @@ class AiReportDraft(BaseModel):
     summary: str = Field(min_length=1, max_length=800)
     weakPoints: list[str] = Field(default_factory=list, max_length=5)
     suggestions: list[str] = Field(default_factory=list, max_length=5)
+
+
+class AiClientError(RuntimeError):
+    def __init__(self, code: str, detail: str):
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
 
 
 TModel = TypeVar("TModel", bound=BaseModel)
@@ -46,52 +60,26 @@ def parse_json_model(content: object, model: type[TModel]) -> TModel:
 
 
 class LangChainAiClient:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, llm: Any | None = None):
         if not settings.openai_api_key:
-            raise RuntimeError("OPENAI_API_KEY is required for real AI generation")
+            raise RuntimeError("OPENAI_API_KEY 未配置，无法调用 AI 服务")
 
-        self.llm = ChatOpenAI(
+        self.llm = llm or ChatOpenAI(
             api_key=settings.openai_api_key,
             base_url=settings.openai_base_url,
             model=settings.openai_model,
             temperature=0.4,
+            timeout=settings.openai_timeout_seconds,
+            max_retries=settings.openai_max_retries,
         )
 
     def generate_quiz(self, input_text: str) -> AiQuizDraft:
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "你是一个擅长把知识点转成闯关题的中文学习教练。"
-                    "请生成严格适合移动端展示的 5 道单选题。"
-                    "每题 4 个选项，只有一个正确答案，讲解要短且具体。"
-                    "所有题目必须直接围绕用户提供的学习内容，不要切换到无关主题。",
-                ),
-                (
-                    "human",
-                    "用户要学习的内容是：{input_text}\n"
-                    "请只围绕这个内容出题。\n\n"
-                    "只返回 JSON，不要 Markdown，不要解释。JSON 结构必须是：\n"
-                    "{{\n"
-                    '  "topic": "主题名",\n'
-                    '  "questions": [\n'
-                    "    {{\n"
-                    '      "id": "q1",\n'
-                    '      "stem": "题干",\n'
-                    '      "options": ["选项A", "选项B", "选项C", "选项D"],\n'
-                    '      "answerIndex": 0,\n'
-                    '      "explanation": "答案讲解",\n'
-                    '      "knowledgePoint": "知识点"\n'
-                    "    }}\n"
-                    "  ]\n"
-                    "}}\n"
-                    "必须刚好 5 道题，id 从 q1 到 q5，answerIndex 必须是 0 到 3。",
-                ),
-            ]
+        return self._invoke_structured_prompt(
+            prompt=build_quiz_prompt(),
+            payload={"input_text": input_text},
+            model=AiQuizDraft,
+            invalid_response_detail="AI 返回的题目结构不合法，请稍后重试",
         )
-        chain = prompt | self.llm
-        message = chain.invoke({"input_text": input_text})
-        return parse_json_model(message.content, AiQuizDraft)
 
     def generate_report(
         self,
@@ -114,33 +102,118 @@ class LangChainAiClient:
                     }
                 )
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "你是一个中文学习复盘教练。"
-                    "你只能基于前端提供的真实答题结果做总结，不要改写分数或正确率。"
-                    "输出要适合小程序移动端阅读，短句、具体、有行动建议。",
-                ),
-                (
-                    "human",
-                    "主题：{topic}\n正确率：{accuracy}%\n错题信息：{wrong_points}\n"
-                    "请生成总结、薄弱点和下一步建议。\n\n"
-                    "只返回 JSON，不要 Markdown，不要解释。JSON 结构必须是：\n"
-                    "{{\n"
-                    '  "summary": "本轮学习总结",\n'
-                    '  "weakPoints": ["薄弱点1"],\n'
-                    '  "suggestions": ["建议1", "建议2"]\n'
-                    "}}",
-                ),
-            ]
-        )
-        chain = prompt | self.llm
-        message = chain.invoke(
-            {
+        return self._invoke_structured_prompt(
+            prompt=build_report_prompt(),
+            payload={
                 "topic": topic,
                 "accuracy": accuracy,
                 "wrong_points": wrong_points,
-            }
+            },
+            model=AiReportDraft,
+            invalid_response_detail="AI 返回的复盘报告结构不合法，请稍后重试",
         )
-        return parse_json_model(message.content, AiReportDraft)
+
+    def _invoke_structured_prompt(
+        self,
+        *,
+        prompt: Any,
+        payload: dict[str, Any],
+        model: type[TModel],
+        invalid_response_detail: str,
+    ) -> TModel:
+        chain = prompt | self.llm.with_structured_output(
+            model,
+            method="json_mode",
+            include_raw=True,
+        )
+
+        try:
+            result = chain.invoke(payload)
+        except Exception as exc:
+            raise self._classify_exception(exc, invalid_response_detail) from exc
+
+        return self._extract_result(
+            result=result,
+            model=model,
+            invalid_response_detail=invalid_response_detail,
+        )
+
+    def _extract_result(
+        self,
+        *,
+        result: object,
+        model: type[TModel],
+        invalid_response_detail: str,
+    ) -> TModel:
+        if not isinstance(result, dict):
+            return self._validate_parsed_result(
+                parsed=result,
+                model=model,
+                invalid_response_detail=invalid_response_detail,
+            )
+
+        parsed = result.get("parsed")
+        if parsed is not None:
+            return self._validate_parsed_result(
+                parsed=parsed,
+                model=model,
+                invalid_response_detail=invalid_response_detail,
+            )
+
+        raw_message = result.get("raw")
+        raw_content = getattr(raw_message, "content", raw_message)
+        parsing_error = result.get("parsing_error")
+
+        if self._is_empty_content(raw_content):
+            raise AiClientError("ai_invalid_response", invalid_response_detail) from (
+                parsing_error if isinstance(parsing_error, BaseException) else None
+            )
+
+        try:
+            return parse_json_model(raw_content, model)
+        except (ValidationError, ValueError, TypeError) as exc:
+            raise AiClientError("ai_invalid_response", invalid_response_detail) from (
+                parsing_error if isinstance(parsing_error, BaseException) else exc
+            )
+
+    @staticmethod
+    def _validate_parsed_result(
+        *,
+        parsed: object,
+        model: type[TModel],
+        invalid_response_detail: str,
+    ) -> TModel:
+        try:
+            if isinstance(parsed, model):
+                return parsed
+            return model.model_validate(parsed)
+        except (ValidationError, ValueError, TypeError) as exc:
+            raise AiClientError("ai_invalid_response", invalid_response_detail) from exc
+
+    @staticmethod
+    def _is_empty_content(content: object) -> bool:
+        if content is None:
+            return True
+        if isinstance(content, str):
+            return not content.strip()
+        if isinstance(content, list):
+            return len(content) == 0
+        return False
+
+    @staticmethod
+    def _classify_exception(exc: Exception, invalid_response_detail: str) -> AiClientError:
+        if isinstance(exc, AiClientError):
+            return exc
+        if isinstance(exc, AuthenticationError):
+            return AiClientError("ai_auth_error", "AI 服务鉴权失败，请检查 API Key 配置")
+        if isinstance(exc, RateLimitError):
+            return AiClientError("ai_rate_limited", "AI 服务当前限流，请稍后重试")
+        if isinstance(exc, APITimeoutError):
+            return AiClientError("ai_timeout", "AI 服务响应超时，请稍后重试")
+        if isinstance(exc, APIConnectionError):
+            return AiClientError("ai_connection_error", "AI 服务连接失败，请稍后重试")
+        if isinstance(exc, APIStatusError):
+            return AiClientError("ai_upstream_error", "AI 服务暂时不可用，请稍后重试")
+        if isinstance(exc, (ValidationError, ValueError, TypeError)):
+            return AiClientError("ai_invalid_response", invalid_response_detail)
+        return AiClientError("ai_upstream_error", "AI 服务暂时不可用，请稍后重试")

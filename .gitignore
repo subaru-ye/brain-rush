@@ -8,3 +8,4 @@ dist/
 .swc/
 .env
 project.private.config.json
+docs/optimize.md

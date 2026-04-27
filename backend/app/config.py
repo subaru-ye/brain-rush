@@ -15,7 +15,9 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_base_url: str = Field(default="https://api.deepseek.com", alias="OPENAI_BASE_URL")
-    openai_model: str = Field(default="deepseek-chat", alias="OPENAI_MODEL")
+    openai_model: str = Field(default="deepseek-v4-flash", alias="OPENAI_MODEL")
+    openai_timeout_seconds: float = Field(default=60.0, alias="OPENAI_TIMEOUT_SECONDS")
+    openai_max_retries: int = Field(default=2, alias="OPENAI_MAX_RETRIES")
     frontend_origins: str = Field(default="*", alias="FRONTEND_ORIGINS")
 
     model_config = SettingsConfigDict(
