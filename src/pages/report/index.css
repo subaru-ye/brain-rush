@@ -1,0 +1,13 @@
+.wrong-review {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px dashed #171717;
+}
+
+.wrong-title {
+  font-weight: 900;
+  color: #ff5a4d;
+}
