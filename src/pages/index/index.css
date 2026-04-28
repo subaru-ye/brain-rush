@@ -1,3 +1,34 @@
-.api-panel {
+.index-screen {
+  padding-top: 42px;
+  padding-bottom: 28px;
+}
+
+.index-screen .hero-title {
+  margin-top: 0;
+}
+
+.index-screen .ui-panel {
   margin-top: 18px;
+}
+
+.index-screen .sticker-stack {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0 18px;
+}
+
+.index-screen .topic-sticker {
+  width: 100%;
+  min-height: 36px;
+  justify-content: center;
+  padding: 6px 8px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 340px) {
+  .index-screen .sticker-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

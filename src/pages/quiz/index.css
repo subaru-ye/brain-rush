@@ -1,3 +1,54 @@
+.quiz-screen {
+  padding-top: 36px;
+}
+
+.quiz-topbar {
+  justify-content: flex-start;
+  margin-bottom: 14px;
+}
+
+.question-shell {
+  position: relative;
+  margin-top: 24px;
+}
+
+.question-shell .ui-panel {
+  padding-top: 48px;
+}
+
+.knowledge-float {
+  position: absolute;
+  z-index: 2;
+  top: -18px;
+  left: 28px;
+  right: 28px;
+  display: flex;
+  justify-content: center;
+}
+
+.knowledge-float .ui-badge {
+  width: 100%;
+  max-width: 290px;
+}
+
+.knowledge-float text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .explain-panel {
   margin-top: 18px;
+}
+
+.explain-panel .ui-panel {
+  gap: 12px;
+  padding-top: 15px;
+}
+
+.answer-line {
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.62;
 }

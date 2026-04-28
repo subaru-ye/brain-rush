@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react"
-import { Button, Text, View } from "@tarojs/components"
+import { Text, View } from "@tarojs/components"
 import Taro, { useLoad } from "@tarojs/taro"
 
+import { ActionButton, Badge, Panel } from "@/components/ui"
 import { getCurrentSession, saveCurrentSession } from "@/services/session"
 import type { QuizSession, UserAnswer } from "@/types/learning"
 
@@ -79,61 +80,59 @@ export default function QuizPage() {
   if (!session || !question) {
     return (
       <View className='screen center-screen'>
-        <View className='badge yellow'><Text>读取题目中</Text></View>
+        <Badge tone='yellow'>读取题目中</Badge>
       </View>
     )
   }
 
   return (
-    <View className='screen'>
-      <View className='topbar'>
-        <View className={answered && selectedIndex !== question.answerIndex ? "badge red" : "badge green"}>
-          <Text>第 {currentIndex + 1} / {session.questions.length} 题</Text>
-        </View>
-        <View className='badge yellow'><Text>糗学值 +12</Text></View>
+    <View className='screen quiz-screen'>
+      <View className='topbar quiz-topbar'>
+        <Badge tone={answered && selectedIndex !== question.answerIndex ? "red" : "green"}>
+          第 {currentIndex + 1} / {session.questions.length} 题
+        </Badge>
       </View>
 
       <View className='progress'>
         <View className='progress-fill' style={{ width: `${progress}%` }} />
       </View>
 
-      <View className='comic-panel tilt-right'>
-        <View className='badge blue'><Text>知识点：{question.knowledgePoint}</Text></View>
-        <View className='question-title'><Text>{question.stem}</Text></View>
-        <View className='option-list'>
-          {question.options.map((option, index) => (
-            <View key={option} className={getOptionClass(index)} onClick={() => handleSelect(index)}>
-              <View className='option-mark'><Text>{optionLabels[index]}</Text></View>
-              <View className='option-text'><Text>{option}</Text></View>
-            </View>
-          ))}
+      <View className='question-shell'>
+        <View className='knowledge-float'>
+          <Badge tone='blue'>知识点：{question.knowledgePoint}</Badge>
         </View>
+        <Panel tilt='right'>
+          <View className='question-title'><Text>{question.stem}</Text></View>
+          <View className='option-list'>
+            {question.options.map((option, index) => (
+              <View key={option} className={getOptionClass(index)} onClick={() => handleSelect(index)}>
+                <View className='option-mark'><Text>{optionLabels[index]}</Text></View>
+                <View className='option-text'><Text>{option}</Text></View>
+              </View>
+            ))}
+          </View>
+        </Panel>
       </View>
 
       {answered ? (
-        <View className='comic-panel explain-panel'>
-          <View className='topbar compact'>
-            <View className={selectedIndex === question.answerIndex ? "badge green" : "badge red"}>
-              <Text>{selectedIndex === question.answerIndex ? "答对啦" : "踩坑啦"}</Text>
+        <View className='explain-panel'>
+          <Panel tone='soft'>
+            <View className='topbar compact'>
+              <Badge tone={selectedIndex === question.answerIndex ? "green" : "red"} size='sm'>
+                {selectedIndex === question.answerIndex ? "答对啦" : "踩坑啦"}
+              </Badge>
+              <View className='burst'><Text>解析</Text></View>
             </View>
-            <View className='burst'><Text>解析</Text></View>
-          </View>
-          <View className='explain-title'><Text>老师拍黑板：看正确答案</Text></View>
-          <View className='subcopy'>
-            <Text>正确答案是 {optionLabels[question.answerIndex]}：{question.options[question.answerIndex]}</Text>
-          </View>
-          <View className='explain-copy'><Text>{question.explanation}</Text></View>
-          <Button className='comic-button green' onClick={handleNext}>
-            <Text>{currentIndex >= session.questions.length - 1 ? "生成复盘报告" : "下一题"}</Text>
-          </Button>
+            <View className='answer-line'>
+              <Text>正确答案是 {optionLabels[question.answerIndex]}：{question.options[question.answerIndex]}</Text>
+            </View>
+            <View className='explain-copy'><Text>{question.explanation}</Text></View>
+            <ActionButton tone='success' onClick={handleNext}>
+              {currentIndex >= session.questions.length - 1 ? "生成复盘报告" : "下一题"}
+            </ActionButton>
+          </Panel>
         </View>
-      ) : (
-        <View className='sticker-stack'>
-          <View className='topic-sticker'><Text>别慌，先读题</Text></View>
-          <View className='topic-sticker'><Text>选项会坑人</Text></View>
-          <View className='topic-sticker'><Text>答完立刻讲解</Text></View>
-        </View>
-      )}
+      ) : null}
     </View>
   )
 }
