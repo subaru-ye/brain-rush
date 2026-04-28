@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Text, View } from "@tarojs/components"
 import Taro, { useLoad } from "@tarojs/taro"
 
-import { ActionButton, Badge, Panel, ReportSection } from "@/components/ui"
+import { ActionButton, Badge } from "@/components/ui"
 import { generateReport, getFriendlyErrorMessage } from "@/services/api"
 import { saveLearningRecordToHistory } from "@/services/history"
 import { clearCurrentSession, getCurrentSession, saveCurrentSession } from "@/services/session"
@@ -72,41 +72,28 @@ export default function ReportPage() {
     const correctCount = getCorrectCount(session.questions, session.answers)
     const accuracy = getAccuracyPercent(session.questions, session.answers)
     return (
-      <View className='screen'>
-        <View className='topbar'>
-          <Badge tone='blue'>Step 3</Badge>
-          <Badge tone='yellow'>POST /api/generate-report</Badge>
+      <View className='screen report-screen'>
+        <View className='report-status'>
+          <Badge tone='green'>本次掌握度</Badge>
+          <View className='report-status-copy'><Text>生成中</Text></View>
         </View>
-        <View className='hero-title'><Text>答完啦，{"\n"}该复盘了。</Text></View>
-        <View className='subcopy'><Text>前端把真实答题结果交给报告接口，AI 只负责总结，不负责乱编分数。</Text></View>
-        <View className='score-box'>
-          <View className='score-item'>
-            <View className='score-number'>
-              <Text>{correctCount}/{session.questions.length}</Text>
-            </View>
-            <View><Text>答对题数</Text></View>
-          </View>
-          <View className='score-item'>
-            <View className='score-number'><Text>{accuracy}%</Text></View>
-            <View><Text>正确率</Text></View>
+        <View className='hero-title'><Text>正在整理报告</Text></View>
+        <View className='subcopy'><Text>先统计答题结果，再把重点和错题整理成复习卡。</Text></View>
+        <View className='report-summary-card'>
+          <View className='score-ring'><Text>{accuracy}%</Text></View>
+          <View className='summary-copy'>
+            <View className='summary-topic'><Text>{session.topic}</Text></View>
+            <View className='summary-desc'><Text>已答对 {correctCount} / {session.questions.length}，AI 正在补充复盘建议。</Text></View>
           </View>
         </View>
-        <Panel tone='soft'>
-          <Badge tone='red' size='sm'>错题包</Badge>
-          <View className='api-card'><Text>score: 程序计算，不交给 AI 猜</Text></View>
-          <View className='status-row'>
-            <View className='spinner' />
-            <View className='status-copy'><Text>AI 正在写复盘小纸条...</Text></View>
-          </View>
-        </Panel>
       </View>
     )
   }
 
   if (error || !report) {
     return (
-      <View className='screen'>
-        <View className='hero-title'><Text>报告卡住了</Text></View>
+      <View className='screen report-screen'>
+        <View className='hero-title'><Text>报告没生成</Text></View>
         <View className='subcopy'><Text>{error || "报告生成失败，请重试"}</Text></View>
         <ActionButton tone='primary' onClick={() => requestReport(session)}>
           重新生成报告
@@ -115,35 +102,48 @@ export default function ReportPage() {
     )
   }
 
+  const correctCount = getCorrectCount(session.questions, session.answers)
+  const weakPoints = report.weakPoints.length ? report.weakPoints : ["本轮没有明显薄弱点"]
+  const memoryItems = [
+    report.summary,
+    ...weakPoints,
+    ...(report.suggestions.length ? report.suggestions : ["再练一轮错题，巩固记忆。"])
+  ].slice(0, 3)
+
   return (
-    <View className='screen'>
-      <View className='topbar'>
-        <Badge tone='green'>通关报告</Badge>
-        <Badge tone='yellow'>{session.topic}</Badge>
-      </View>
-      <View className='hero-title'><Text>这回没白学，{"\n"}你掌握 {report.accuracy}%。</Text></View>
-
-      <View className='score-box'>
-        <View className='score-item green-bg'>
-          <View className='score-number'><Text>{report.score}</Text></View>
-          <View><Text>本轮得分</Text></View>
-        </View>
-        <View className='score-item yellow-bg'>
-          <View className='score-number'><Text>{report.wrongQuestions.length}</Text></View>
-          <View><Text>需要复习</Text></View>
-        </View>
+    <View className='screen report-screen'>
+      <View className='report-status'>
+        <Badge tone='green'>本次掌握度</Badge>
+        <View className='report-status-copy'><Text>已完成</Text></View>
       </View>
 
-      <ReportSection tone='good' title='核心知识点'>
-        <View><Text>{report.summary}</Text></View>
-      </ReportSection>
+      <View className='hero-title'><Text>本次学习报告</Text></View>
+      <View className='subcopy'><Text>报告先给结论，再给重点，避免一屏塞太多信息。</Text></View>
 
-      <ReportSection tone='warn' title='薄弱点'>
-        <View><Text>{report.weakPoints.length ? report.weakPoints.join("、") : "本轮没有明显薄弱点"}</Text></View>
-      </ReportSection>
+      <View className='report-summary-card'>
+        <View className='score-ring'><Text>{report.accuracy}%</Text></View>
+        <View className='summary-copy'>
+          <View className='summary-topic'><Text>{session.topic}</Text></View>
+          <View className='summary-desc'><Text>{report.summary}</Text></View>
+          <View className='summary-tags'>
+            <View><Text>答对 {correctCount} / {session.questions.length}</Text></View>
+            <View><Text>错题 {report.wrongQuestions.length}</Text></View>
+          </View>
+        </View>
+      </View>
+
+      <View className='memory-card'>
+        <View className='section-title'><Text>这次记住 3 件事</Text></View>
+        {memoryItems.map((item) => (
+          <View key={item} className='memory-item'>
+            <Text>• {item}</Text>
+          </View>
+        ))}
+      </View>
 
       {report.wrongQuestions.length ? (
-        <ReportSection title='错题回顾'>
+        <View className='memory-card'>
+          <View className='section-title'><Text>错题回顾</Text></View>
           {report.wrongQuestions.map((item) => (
             <View key={item.questionId} className='wrong-review'>
               <View className='wrong-title'><Text>{item.knowledgePoint}</Text></View>
@@ -152,20 +152,22 @@ export default function ReportPage() {
               <View className='subcopy'><Text>正确答案：{item.correctAnswer}</Text></View>
             </View>
           ))}
-        </ReportSection>
+        </View>
       ) : null}
 
-      <ReportSection title='下一步建议'>
-        {report.suggestions.map((item) => (
-          <View key={item} className='suggestion-item'>
-            <Text>· {item}</Text>
-          </View>
-        ))}
-      </ReportSection>
+      <View className='poster-card'>
+        <View className='poster-title'><Text>分享海报</Text></View>
+        <View className='poster-copy'><Text>把知识做成关卡，记忆会更深。</Text></View>
+        <View className='poster-icon'>
+          <View /><View /><View />
+          <View /><View /><View />
+          <View /><View /><View />
+        </View>
+      </View>
 
-      <View className='footer-actions'>
-        <ActionButton tone='secondary' onClick={handleRestart}>再来一局</ActionButton>
-        <ActionButton tone='primary'>分享战绩</ActionButton>
+      <View className='report-actions'>
+        <ActionButton tone='primary'>生成海报</ActionButton>
+        <ActionButton tone='secondary' onClick={handleRestart}>再练一轮错题</ActionButton>
       </View>
       {historyNotice ? <View className='history-notice'><Text>{historyNotice}</Text></View> : null}
     </View>

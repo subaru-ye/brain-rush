@@ -1,54 +1,183 @@
 .quiz-screen {
-  padding-top: 36px;
+  padding: 28px 20px 42px;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(93, 186, 179, 0.18), transparent 24%),
+    linear-gradient(180deg, rgba(255, 253, 244, 0.84), rgba(239, 248, 246, 0.94));
 }
 
-.quiz-topbar {
-  justify-content: flex-start;
-  margin-bottom: 14px;
-}
-
-.question-shell {
-  position: relative;
-  margin-top: 24px;
-}
-
-.question-shell .ui-panel {
-  padding-top: 48px;
-}
-
-.knowledge-float {
-  position: absolute;
-  z-index: 2;
-  top: -18px;
-  left: 28px;
-  right: 28px;
+.quiz-status {
   display: flex;
-  justify-content: center;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border: 1px solid rgba(35, 54, 58, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 252, 0.82);
+  box-shadow: 0 12px 28px rgba(49, 90, 89, 0.08);
 }
 
-.knowledge-float .ui-badge {
-  width: 100%;
-  max-width: 290px;
-}
-
-.knowledge-float text {
+.quiz-topic {
+  max-width: 180px;
+  padding: 7px 14px;
   overflow: hidden;
+  border-radius: 999px;
+  background: #e8f5f2;
+  color: #579c96;
+  font-size: 13px;
+  font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.explain-panel {
-  margin-top: 18px;
+.quiz-count {
+  color: #6f7f7f;
+  font-size: 13px;
+  font-weight: 900;
 }
 
-.explain-panel .ui-panel {
+.question-card {
+  margin-top: 18px;
+  padding: 22px 20px 24px;
+  border: 1px solid rgba(35, 54, 58, 0.1);
+  border-radius: 24px;
+  background: rgba(255, 255, 252, 0.9);
+  box-shadow: 0 18px 36px rgba(49, 90, 89, 0.1);
+}
+
+.question-card .question-chip {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 6px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: #eef8f6;
+  color: #5aa49d;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: none;
+}
+
+.question-card .question-title {
+  margin-top: 18px;
+  color: #23363a;
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 900;
+  line-height: 1.38;
+}
+
+.question-tip {
+  margin-top: 14px;
+  color: #768889;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.quiz-screen .option-list {
   gap: 12px;
-  padding-top: 15px;
+  margin-top: 16px;
+}
+
+.quiz-screen .option {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 14px 16px;
+  border: 1px solid rgba(35, 54, 58, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 252, 0.9);
+  box-shadow: 0 14px 28px rgba(49, 90, 89, 0.08);
+}
+
+.quiz-screen .option.correct {
+  border-color: rgba(85, 184, 175, 0.22);
+  background: #eef8ef;
+}
+
+.quiz-screen .option.wrong {
+  border-color: rgba(242, 91, 82, 0.22);
+  background: #fff0eb;
+}
+
+.quiz-screen .option.muted {
+  opacity: 0.74;
+}
+
+.quiz-screen .option-mark {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  background: #eff8f6;
+  color: #5aa49d;
+  font-size: 14px;
+}
+
+.quiz-screen .option-text {
+  color: #314447;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.54;
+}
+
+.option-result {
+  font-size: 20px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.correct-mark {
+  color: #55a15c;
+}
+
+.wrong-mark {
+  color: #d75b51;
+}
+
+.answer-card {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid rgba(35, 54, 58, 0.1);
+  border-radius: 22px;
+  background: rgba(255, 255, 252, 0.82);
+  box-shadow: 0 18px 36px rgba(49, 90, 89, 0.08);
+}
+
+.answer-card-title {
+  color: #4b6869;
+  font-size: 17px;
+  font-weight: 900;
 }
 
 .answer-line {
-  color: var(--color-ink);
+  margin-top: 10px;
+  color: #314447;
   font-size: 15px;
   font-weight: 900;
   line-height: 1.62;
+}
+
+.explain-copy {
+  margin: 8px 0 16px;
+  color: #647778;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.72;
+}
+
+.full-explain-link {
+  min-height: 48px;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 246, 213, 0.9), rgba(255, 250, 231, 0.72));
+  color: #9a7b25;
+  font-size: 15px;
+  font-weight: 900;
 }

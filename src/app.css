@@ -2,20 +2,20 @@ page {
   --color-paper: #fff8e7;
   --color-paper-soft: #fffdf4;
   --color-paper-deep: #f4ead1;
-  --color-line: #d7c7a1;
-  --color-ink: #201d18;
-  --color-copy: #4b4338;
-  --color-muted: #7f7465;
-  --color-yellow: #ffd257;
-  --color-yellow-soft: #ffe9a4;
-  --color-green: #1fbc8f;
-  --color-green-soft: #dff8ef;
-  --color-blue: #67baf2;
-  --color-blue-soft: #e2f2ff;
+  --color-line: #c8ddd5;
+  --color-ink: #23363a;
+  --color-copy: #4d6365;
+  --color-muted: #718585;
+  --color-yellow: #5dbab3;
+  --color-yellow-soft: #e3f3ef;
+  --color-green: #55b8af;
+  --color-green-soft: #ddf2ee;
+  --color-blue: #82cfc7;
+  --color-blue-soft: #e5f5f2;
   --color-red: #f25b52;
   --color-red-soft: #ffe3df;
   --color-border: #201d18;
-  --shadow-rgb: 32, 29, 24;
+  --shadow-rgb: 35, 54, 58;
   --shadow-strong: 5px 5px 0 rgba(var(--shadow-rgb), 0.98);
   --shadow-soft: 0 12px 28px rgba(var(--shadow-rgb), 0.1);
   --radius-pill: 999px;
@@ -36,10 +36,10 @@ page {
   color: var(--color-ink);
   font-family: var(--font-body);
   background:
-    linear-gradient(rgba(103, 186, 242, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(103, 186, 242, 0.04) 1px, transparent 1px),
-    radial-gradient(circle at top left, rgba(255, 210, 87, 0.32), transparent 34%),
-    radial-gradient(circle at top right, rgba(103, 186, 242, 0.18), transparent 30%),
+    linear-gradient(rgba(93, 186, 179, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(93, 186, 179, 0.04) 1px, transparent 1px),
+    radial-gradient(circle at top left, rgba(255, 238, 191, 0.34), transparent 34%),
+    radial-gradient(circle at top right, rgba(93, 186, 179, 0.22), transparent 30%),
     var(--color-paper);
   background-size: 26px 26px, 26px 26px, auto, auto, auto;
 }
@@ -210,7 +210,7 @@ button::after {
 .progress-fill {
   height: 100%;
   border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--color-green) 0%, #60d6b4 50%, var(--color-blue) 100%);
+  background: linear-gradient(90deg, #5dbab3 0%, #83d3cb 58%, #bde8e4 100%);
 }
 
 .option-list {
@@ -482,11 +482,13 @@ button::after {
 }
 
 .ui-button--primary {
-  background: linear-gradient(180deg, #ffd96f 0%, var(--color-yellow) 100%);
+  background: linear-gradient(180deg, #6fcac2 0%, #55b8af 100%);
+  color: #fff;
 }
 
 .ui-button--success {
-  background: linear-gradient(180deg, #48d0a7 0%, var(--color-green) 100%);
+  background: linear-gradient(180deg, #6fcac2 0%, var(--color-green) 100%);
+  color: #fff;
 }
 
 .ui-button--secondary {
