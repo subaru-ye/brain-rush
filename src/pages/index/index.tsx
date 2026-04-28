@@ -3,7 +3,7 @@ import { Text, Textarea, View } from "@tarojs/components"
 import Taro from "@tarojs/taro"
 
 import { ActionButton, Panel } from "@/components/ui"
-import { generateQuiz } from "@/services/api"
+import { generateQuiz, getFriendlyErrorMessage } from "@/services/api"
 import { saveCurrentSession } from "@/services/session"
 
 import "./index.css"
@@ -38,7 +38,7 @@ export default function IndexPage() {
       })
       await Taro.navigateTo({ url: "/pages/quiz/index" })
     } catch (err) {
-      setError(err instanceof Error ? err.message : "题库生成失败，请重试")
+      setError(getFriendlyErrorMessage(err, "题库生成失败，请重试"))
     } finally {
       setLoading(false)
     }

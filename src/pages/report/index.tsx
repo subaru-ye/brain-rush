@@ -3,9 +3,10 @@ import { Text, View } from "@tarojs/components"
 import Taro, { useLoad } from "@tarojs/taro"
 
 import { ActionButton, Badge, Panel, ReportSection } from "@/components/ui"
-import { generateReport } from "@/services/api"
+import { generateReport, getFriendlyErrorMessage } from "@/services/api"
 import { clearCurrentSession, getCurrentSession, saveCurrentSession } from "@/services/session"
 import type { QuizSession, ReviewReport } from "@/types/learning"
+import { getAccuracyPercent, getCorrectCount } from "@/utils/quiz"
 
 import "./index.css"
 
@@ -40,7 +41,7 @@ export default function ReportPage() {
       setSession(storedSession)
       saveCurrentSession(storedSession)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "报告生成失败，请重试")
+      setError(getFriendlyErrorMessage(err, "报告生成失败，请重试"))
     } finally {
       setLoading(false)
     }
@@ -49,14 +50,6 @@ export default function ReportPage() {
   function handleRestart() {
     clearCurrentSession()
     Taro.redirectTo({ url: "/pages/index/index" })
-  }
-
-  function getCorrectCount(nextSession: QuizSession) {
-    const questionById = new Map(nextSession.questions.map((question) => [question.id, question]))
-    return nextSession.answers.filter((answer) => {
-      const question = questionById.get(answer.questionId)
-      return question ? answer.selectedIndex === question.answerIndex : false
-    }).length
   }
 
   if (!session) {
@@ -68,8 +61,8 @@ export default function ReportPage() {
   }
 
   if (loading) {
-    const correctCount = getCorrectCount(session)
-    const accuracy = Math.round((correctCount / session.questions.length) * 100)
+    const correctCount = getCorrectCount(session.questions, session.answers)
+    const accuracy = getAccuracyPercent(session.questions, session.answers)
     return (
       <View className='screen'>
         <View className='topbar'>
