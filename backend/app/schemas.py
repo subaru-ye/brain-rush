@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -95,3 +96,58 @@ class GenerateReportResponse(BaseModel):
 class AiGenerationError(BaseModel):
     code: str
     detail: str
+
+
+class ApiError(BaseModel):
+    code: str
+    detail: str
+
+
+class WechatLoginRequest(BaseModel):
+    code: str = Field(min_length=1)
+
+
+class AuthResponse(BaseModel):
+    token: str
+    userId: str
+
+
+class HistorySaveRequest(BaseModel):
+    sessionId: str = Field(min_length=1)
+    topic: str = Field(min_length=1, max_length=120)
+    questions: list[QuizQuestion] = Field(min_length=1, max_length=20)
+    answers: list[UserAnswer] = Field(min_length=1, max_length=20)
+    report: ReviewReport
+
+    @model_validator(mode="after")
+    def validate_answer_references(self) -> "HistorySaveRequest":
+        question_ids = {question.id for question in self.questions}
+        answer_ids = {answer.questionId for answer in self.answers}
+        if not answer_ids.issubset(question_ids):
+            raise ValueError("绛旀涓寘鍚笉瀛樺湪鐨勯鐩?ID")
+        return self
+
+
+class HistoryRecordSummary(BaseModel):
+    id: str
+    sessionId: str
+    topic: str
+    score: int
+    total: int
+    accuracy: int
+    completedAt: datetime
+    createdAt: datetime
+
+
+class HistoryRecordDetail(HistoryRecordSummary):
+    questions: list[QuizQuestion]
+    answers: list[UserAnswer]
+    report: ReviewReport
+
+
+class HistorySaveResponse(BaseModel):
+    record: HistoryRecordDetail
+
+
+class HistoryListResponse(BaseModel):
+    records: list[HistoryRecordSummary]

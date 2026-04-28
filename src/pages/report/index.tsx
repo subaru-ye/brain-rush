@@ -4,6 +4,7 @@ import Taro, { useLoad } from "@tarojs/taro"
 
 import { ActionButton, Badge, Panel, ReportSection } from "@/components/ui"
 import { generateReport, getFriendlyErrorMessage } from "@/services/api"
+import { saveLearningRecordToHistory } from "@/services/history"
 import { clearCurrentSession, getCurrentSession, saveCurrentSession } from "@/services/session"
 import type { QuizSession, ReviewReport } from "@/types/learning"
 import { getAccuracyPercent, getCorrectCount } from "@/utils/quiz"
@@ -15,6 +16,7 @@ export default function ReportPage() {
   const [report, setReport] = useState<ReviewReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [historyNotice, setHistoryNotice] = useState("")
 
   useLoad(() => {
     const stored = getCurrentSession()
@@ -34,12 +36,18 @@ export default function ReportPage() {
   async function requestReport(nextSession: QuizSession) {
     setLoading(true)
     setError("")
+    setHistoryNotice("")
     try {
       const response = await generateReport(nextSession.topic, nextSession.questions, nextSession.answers)
       const storedSession = { ...nextSession, report: response.report }
       setReport(response.report)
       setSession(storedSession)
       saveCurrentSession(storedSession)
+      try {
+        await saveLearningRecordToHistory(storedSession)
+      } catch {
+        setHistoryNotice("报告已生成，但历史记录保存失败，稍后可重新生成报告再保存")
+      }
     } catch (err) {
       setError(getFriendlyErrorMessage(err, "报告生成失败，请重试"))
     } finally {
@@ -159,6 +167,7 @@ export default function ReportPage() {
         <ActionButton tone='secondary' onClick={handleRestart}>再来一局</ActionButton>
         <ActionButton tone='primary'>分享战绩</ActionButton>
       </View>
+      {historyNotice ? <View className='history-notice'><Text>{historyNotice}</Text></View> : null}
     </View>
   )
 }

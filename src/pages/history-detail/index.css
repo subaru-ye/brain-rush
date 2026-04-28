@@ -1,0 +1,9 @@
+.history-detail-meta {
+  display: flex;
+  gap: 10px;
+  margin: 14px 0 18px;
+}
+
+.history-detail-meta .ui-badge {
+  flex-shrink: 0;
+}

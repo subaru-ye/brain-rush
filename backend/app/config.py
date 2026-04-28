@@ -19,6 +19,17 @@ class Settings(BaseSettings):
     openai_timeout_seconds: float = Field(default=60.0, alias="OPENAI_TIMEOUT_SECONDS")
     openai_max_retries: int = Field(default=2, alias="OPENAI_MAX_RETRIES")
     frontend_origins: str = Field(default="*", alias="FRONTEND_ORIGINS")
+    database_url: str = Field(
+        default="postgresql+psycopg://brain_rush:brain_rush@localhost:5432/brain_rush",
+        alias="DATABASE_URL",
+    )
+    auth_token_secret: str = Field(
+        default="dev-brain-rush-secret-change-me-32-bytes",
+        alias="AUTH_TOKEN_SECRET",
+    )
+    auth_token_expire_days: int = Field(default=30, alias="AUTH_TOKEN_EXPIRE_DAYS")
+    wechat_appid: str = Field(default="", alias="WECHAT_APPID")
+    wechat_secret: str = Field(default="", alias="WECHAT_SECRET")
 
     model_config = SettingsConfigDict(
         env_file=(REPO_ROOT / ".env", BACKEND_DIR / ".env"),

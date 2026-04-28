@@ -44,6 +44,10 @@ export default function IndexPage() {
     }
   }
 
+  function handleOpenHistory() {
+    Taro.navigateTo({ url: "/pages/history/index" })
+  }
+
   return (
     <View className='screen index-screen'>
       <View className='hero-title'><Text>今天想把{"\n"}哪个知识点打趴？</Text></View>
@@ -74,6 +78,12 @@ export default function IndexPage() {
       <ActionButton tone='primary' loading={loading} disabled={loading} onClick={handleGenerate}>
         {loading ? "LangChain 正在出题..." : "生成闯关题"}
       </ActionButton>
+
+      <View className='history-entry'>
+        <ActionButton tone='secondary' onClick={handleOpenHistory}>
+          查看历史记录
+        </ActionButton>
+      </View>
     </View>
   )
 }

@@ -1,0 +1,31 @@
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.history-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-card-title {
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.history-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-text-muted);
+}
+
+.history-empty {
+  margin-top: 22px;
+}

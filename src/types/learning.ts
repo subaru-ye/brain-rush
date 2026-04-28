@@ -49,3 +49,33 @@ export interface QuizSession {
   answers: UserAnswer[]
   report?: ReviewReport
 }
+
+export interface AuthSession {
+  token: string
+  userId: string
+}
+
+export interface LearningRecordSummary {
+  id: string
+  sessionId: string
+  topic: string
+  score: number
+  total: number
+  accuracy: number
+  completedAt: string
+  createdAt: string
+}
+
+export interface LearningRecordDetail extends LearningRecordSummary {
+  questions: QuizQuestion[]
+  answers: UserAnswer[]
+  report: ReviewReport
+}
+
+export interface HistoryListResponse {
+  records: LearningRecordSummary[]
+}
+
+export interface HistorySaveResponse {
+  record: LearningRecordDetail
+}

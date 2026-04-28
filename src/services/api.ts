@@ -3,7 +3,11 @@ import Taro from "@tarojs/taro"
 import type {
   GenerateQuizResponse,
   GenerateReportResponse,
+  HistoryListResponse,
+  HistorySaveResponse,
   QuizQuestion,
+  QuizSession,
+  AuthSession,
   UserAnswer
 } from "@/types/learning"
 
@@ -71,14 +75,53 @@ export function getFriendlyErrorMessage(error: unknown, fallback: string): strin
   return messageByCode[error.code] || error.detail || fallback
 }
 
-async function postJson<TResponse>(path: string, data: unknown): Promise<TResponse> {
+interface RequestOptions {
+  token?: string
+}
+
+function buildHeaders(options: RequestOptions = {}): Record<string, string> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json"
+  }
+
+  if (options.token) {
+    headers.Authorization = `Bearer ${options.token}`
+  }
+
+  return headers
+}
+
+async function postJson<TResponse>(
+  path: string,
+  data: unknown,
+  options: RequestOptions = {}
+): Promise<TResponse> {
   const response = await Taro.request<TResponse>({
     url: `${API_BASE_URL}${path}`,
     method: "POST",
     data,
-    header: {
-      "content-type": "application/json"
-    }
+    header: buildHeaders(options)
+  })
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new AppError(
+      getErrorCode(response.data),
+      getErrorDetail(response.data),
+      response.statusCode
+    )
+  }
+
+  return response.data
+}
+
+async function getJson<TResponse>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<TResponse> {
+  const response = await Taro.request<TResponse>({
+    url: `${API_BASE_URL}${path}`,
+    method: "GET",
+    header: buildHeaders(options)
   })
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -106,4 +149,29 @@ export function generateReport(
     questions,
     answers
   })
+}
+
+export function loginWithWechat(code: string): Promise<AuthSession> {
+  return postJson<AuthSession>("/api/auth/wechat", { code })
+}
+
+export function createHistoryRecord(
+  session: QuizSession & { report: NonNullable<QuizSession["report"]> },
+  token: string
+): Promise<HistorySaveResponse> {
+  return postJson<HistorySaveResponse>("/api/history", {
+    sessionId: session.sessionId,
+    topic: session.topic,
+    questions: session.questions,
+    answers: session.answers,
+    report: session.report
+  }, { token })
+}
+
+export function getHistoryRecords(token: string): Promise<HistoryListResponse> {
+  return getJson<HistoryListResponse>("/api/history", { token })
+}
+
+export function getHistoryRecord(recordId: string, token: string) {
+  return getJson<HistorySaveResponse["record"]>(`/api/history/${recordId}`, { token })
 }

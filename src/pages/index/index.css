@@ -27,6 +27,10 @@
   white-space: nowrap;
 }
 
+.index-screen .history-entry {
+  margin-top: 12px;
+}
+
 @media (max-width: 340px) {
   .index-screen .sticker-stack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
