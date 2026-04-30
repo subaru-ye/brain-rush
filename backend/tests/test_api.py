@@ -24,6 +24,14 @@ def test_health(client):
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+    assert response.headers["x-request-id"]
+
+
+def test_request_id_header_is_reused(client):
+    response = client.get("/health", headers={"X-Request-ID": "test-request-id"})
+
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == "test-request-id"
 
 
 def test_generate_quiz_rejects_empty_input(client):
@@ -184,7 +192,11 @@ def test_generate_quiz_returns_timeout_error_code():
     )
     try:
         with TestClient(main_module.app) as client:
-            response = client.post("/api/generate-quiz", json={"inputText": "AI Agent"})
+            response = client.post(
+                "/api/generate-quiz",
+                json={"inputText": "AI Agent"},
+                headers={"X-Request-ID": "quiz-timeout-request"},
+            )
     finally:
         main_module.app.dependency_overrides.clear()
 
@@ -193,6 +205,7 @@ def test_generate_quiz_returns_timeout_error_code():
         "code": "ai_timeout",
         "detail": "AI 服务响应超时，请稍后重试",
     }
+    assert response.headers["x-request-id"] == "quiz-timeout-request"
 
 
 def test_generate_report_returns_rate_limit_error_code():

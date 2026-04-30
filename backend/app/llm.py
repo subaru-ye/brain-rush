@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from typing import Any, TypeVar
 
 from langchain_openai import ChatOpenAI
@@ -15,6 +16,7 @@ from openai import (
 from pydantic import BaseModel, Field, ValidationError
 
 from .config import Settings
+from .observability import log_event
 from .prompts import build_quiz_prompt, build_report_prompt
 from .schemas import QuizQuestion, UserAnswer
 
@@ -64,17 +66,22 @@ class LangChainAiClient:
         if not settings.openai_api_key:
             raise RuntimeError("OPENAI_API_KEY 未配置，无法调用 AI 服务")
 
+        self.model_name = settings.openai_model
+        self.base_url = settings.openai_base_url
+        self.timeout_seconds = settings.openai_timeout_seconds
+        self.max_retries = settings.openai_max_retries
         self.llm = llm or ChatOpenAI(
             api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-            model=settings.openai_model,
+            base_url=self.base_url,
+            model=self.model_name,
             temperature=0.4,
-            timeout=settings.openai_timeout_seconds,
-            max_retries=settings.openai_max_retries,
+            timeout=self.timeout_seconds,
+            max_retries=self.max_retries,
         )
 
     def generate_quiz(self, input_text: str) -> AiQuizDraft:
         return self._invoke_structured_prompt(
+            operation="generate_quiz",
             prompt=build_quiz_prompt(),
             payload={"input_text": input_text},
             model=AiQuizDraft,
@@ -103,6 +110,7 @@ class LangChainAiClient:
                 )
 
         return self._invoke_structured_prompt(
+            operation="generate_report",
             prompt=build_report_prompt(),
             payload={
                 "topic": topic,
@@ -116,11 +124,13 @@ class LangChainAiClient:
     def _invoke_structured_prompt(
         self,
         *,
+        operation: str,
         prompt: Any,
         payload: dict[str, Any],
         model: type[TModel],
         invalid_response_detail: str,
     ) -> TModel:
+        started_at = time.perf_counter()
         chain = prompt | self.llm.with_structured_output(
             model,
             method="json_mode",
@@ -129,14 +139,37 @@ class LangChainAiClient:
 
         try:
             result = chain.invoke(payload)
+            parsed_result = self._extract_result(
+                result=result,
+                model=model,
+                invalid_response_detail=invalid_response_detail,
+            )
         except Exception as exc:
-            raise self._classify_exception(exc, invalid_response_detail) from exc
+            classified = self._classify_exception(exc, invalid_response_detail)
+            log_event(
+                "ai_call_failed",
+                operation=operation,
+                model=self.model_name,
+                base_url=self.base_url,
+                timeout_seconds=self.timeout_seconds,
+                max_retries=self.max_retries,
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+                code=classified.code,
+            )
+            if classified is exc:
+                raise classified
+            raise classified from exc
 
-        return self._extract_result(
-            result=result,
-            model=model,
-            invalid_response_detail=invalid_response_detail,
+        log_event(
+            "ai_call_completed",
+            operation=operation,
+            model=self.model_name,
+            base_url=self.base_url,
+            timeout_seconds=self.timeout_seconds,
+            max_retries=self.max_retries,
+            duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
         )
+        return parsed_result
 
     def _extract_result(
         self,

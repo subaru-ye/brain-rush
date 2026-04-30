@@ -43,6 +43,8 @@ $env:PYTHONPATH = "$pwd\backend"
 .\backend\.venv\Scripts\uvicorn app.main:app --app-dir backend --reload --port 8000
 ```
 
+后端会输出结构化 JSON 日志，每次请求的响应头都会带上 `X-Request-ID`，可用来在控制台日志中定位本次请求。
+
 ## 后端测试
 
 ```powershell

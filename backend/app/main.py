@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import time
 from functools import lru_cache
 
 from fastapi import Depends, FastAPI, Request
@@ -19,6 +21,14 @@ from .history import (
     upsert_wechat_user,
 )
 from .llm import LangChainAiClient
+from .observability import (
+    REQUEST_ID_HEADER,
+    configure_logging,
+    log_event,
+    new_request_id,
+    reset_request_id,
+    set_request_id,
+)
 from .schemas import (
     AiGenerationError,
     ApiError,
@@ -38,6 +48,7 @@ from .wechat import exchange_wechat_code
 
 
 def create_app() -> FastAPI:
+    configure_logging()
     app = FastAPI(title="Brain Rush API", version="0.1.0")
     settings = get_settings()
 
@@ -49,10 +60,57 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    @app.middleware("http")
+    async def request_observability_middleware(request: Request, call_next):
+        request_id = request.headers.get(REQUEST_ID_HEADER) or new_request_id()
+        request.state.request_id = request_id
+        token = set_request_id(request_id)
+        started_at = time.perf_counter()
+
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+            log_event(
+                "http_request_failed",
+                level=logging.ERROR,
+                method=request.method,
+                path=request.url.path,
+                duration_ms=duration_ms,
+                error_type=type(exc).__name__,
+                exc_info=True,
+            )
+            reset_request_id(token)
+            raise
+
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        response.headers[REQUEST_ID_HEADER] = request_id
+        log_event(
+            "http_request_completed",
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+        )
+        reset_request_id(token)
+        return response
+
     @app.exception_handler(ApiHttpError)
-    async def handle_api_http_error(_: Request, exc: ApiHttpError) -> JSONResponse:
+    async def handle_api_http_error(request: Request, exc: ApiHttpError) -> JSONResponse:
+        request_id = getattr(request.state, "request_id", None)
+        log_event(
+            "api_error",
+            request_id=request_id,
+            status_code=exc.status_code,
+            code=exc.code,
+            detail=exc.detail,
+        )
         payload = ApiError(code=exc.code, detail=exc.detail)
-        return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=payload.model_dump(),
+            headers={REQUEST_ID_HEADER: request_id} if request_id else None,
+        )
 
     @app.get("/health")
     async def health() -> dict[str, str]:
