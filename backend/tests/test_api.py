@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app import main as main_module
+from app.config import Settings
 from app.llm import AiClientError
 from app.services import LearningService
 
@@ -17,6 +18,30 @@ class ErrorAiClient:
 
     def generate_report(self, topic, questions, answers, accuracy):
         raise AiClientError(self.code, self.detail)
+
+
+def limited_settings(max_requests: int = 1) -> Settings:
+    return Settings(
+        GENERATION_RATE_LIMIT_MAX_REQUESTS=max_requests,
+        GENERATION_RATE_LIMIT_WINDOW_SECONDS=3600,
+    )
+
+
+def valid_report_payload() -> dict:
+    return {
+        "topic": "AI Agent",
+        "questions": [
+            {
+                "id": "q1",
+                "stem": "Question 1",
+                "options": ["A", "B", "C", "D"],
+                "answerIndex": 0,
+                "explanation": "Explanation",
+                "knowledgePoint": "Knowledge Point",
+            }
+        ],
+        "answers": [{"questionId": "q1", "selectedIndex": 1, "isCorrect": False}],
+    }
 
 
 def test_health(client):
@@ -49,6 +74,80 @@ def test_generate_quiz_returns_five_valid_questions(client):
     assert len(data["questions"]) == 5
     assert data["questions"][0]["answerIndex"] == 0
     assert data["questions"][0]["explanation"]
+
+
+def test_generate_quiz_is_rate_limited_by_ip_and_path(client):
+    main_module.app.dependency_overrides[main_module.get_settings] = lambda: limited_settings()
+    try:
+        first = client.post("/api/generate-quiz", json={"inputText": "AI Agent"})
+        second = client.post(
+            "/api/generate-quiz",
+            json={"inputText": "AI Agent"},
+            headers={"X-Request-ID": "limited-request"},
+        )
+    finally:
+        main_module.app.dependency_overrides.pop(main_module.get_settings, None)
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert second.json() == {
+        "code": "rate_limited",
+        "detail": "生成请求过于频繁，请稍后再试",
+    }
+    assert second.headers["x-request-id"] == "limited-request"
+
+
+def test_generation_rate_limit_is_scoped_by_path(client):
+    main_module.app.dependency_overrides[main_module.get_settings] = lambda: limited_settings()
+    try:
+        quiz_response = client.post("/api/generate-quiz", json={"inputText": "AI Agent"})
+        report_response = client.post("/api/generate-report", json=valid_report_payload())
+    finally:
+        main_module.app.dependency_overrides.pop(main_module.get_settings, None)
+
+    assert quiz_response.status_code == 200
+    assert report_response.status_code == 200
+
+
+def test_generation_rate_limit_is_scoped_by_client_ip(client):
+    main_module.app.dependency_overrides[main_module.get_settings] = lambda: limited_settings()
+    try:
+        first = client.post(
+            "/api/generate-quiz",
+            json={"inputText": "AI Agent"},
+            headers={"X-Forwarded-For": "10.0.0.1"},
+        )
+        second = client.post(
+            "/api/generate-quiz",
+            json={"inputText": "AI Agent"},
+            headers={"X-Forwarded-For": "10.0.0.1"},
+        )
+        other_ip = client.post(
+            "/api/generate-quiz",
+            json={"inputText": "AI Agent"},
+            headers={"X-Forwarded-For": "10.0.0.2"},
+        )
+    finally:
+        main_module.app.dependency_overrides.pop(main_module.get_settings, None)
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert other_ip.status_code == 200
+
+
+def test_non_generation_routes_are_not_rate_limited(client):
+    main_module.app.dependency_overrides[main_module.get_settings] = lambda: limited_settings()
+    try:
+        first = client.get("/health")
+        second = client.get("/health")
+        history = client.get("/api/history")
+    finally:
+        main_module.app.dependency_overrides.pop(main_module.get_settings, None)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert history.status_code == 401
+    assert history.json()["code"] == "auth_required"
 
 
 def test_generate_quiz_reports_invalid_ai_structure(invalid_quiz_client):

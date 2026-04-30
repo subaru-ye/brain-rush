@@ -12,6 +12,7 @@ import type {
 } from "@/types/learning"
 
 export type AppErrorCode =
+  | "rate_limited"
   | "ai_timeout"
   | "ai_rate_limited"
   | "ai_auth_error"
@@ -64,6 +65,7 @@ export function getFriendlyErrorMessage(error: unknown, fallback: string): strin
   }
 
   const messageByCode: Partial<Record<AppErrorCode, string>> = {
+    rate_limited: "生成请求太频繁了，请稍后再试",
     ai_timeout: "AI 生成超时了，请稍后重试",
     ai_rate_limited: "当前生成请求较多，请稍后再试",
     ai_auth_error: "AI 服务配置暂不可用，请检查后端配置",

@@ -26,6 +26,8 @@ OPENAI_BASE_URL=https://api.deepseek.com
 OPENAI_MODEL=deepseek-v4-flash
 OPENAI_TIMEOUT_SECONDS=60
 OPENAI_MAX_RETRIES=2
+GENERATION_RATE_LIMIT_MAX_REQUESTS=10
+GENERATION_RATE_LIMIT_WINDOW_SECONDS=3600
 DATABASE_URL=postgresql+psycopg://brain_rush:brain_rush@localhost:5432/brain_rush
 AUTH_TOKEN_SECRET=change-me-in-production
 ```
@@ -43,7 +45,7 @@ $env:PYTHONPATH = "$pwd\backend"
 .\backend\.venv\Scripts\uvicorn app.main:app --app-dir backend --reload --port 8000
 ```
 
-后端会输出结构化 JSON 日志，每次请求的响应头都会带上 `X-Request-ID`，可用来在控制台日志中定位本次请求。
+后端会输出结构化 JSON 日志，每次请求的响应头都会带上 `X-Request-ID`，可用来在控制台日志中定位本次请求。生成题目和生成报告接口默认按 IP + 接口限制为每小时 10 次，可通过 `GENERATION_RATE_LIMIT_MAX_REQUESTS` 和 `GENERATION_RATE_LIMIT_WINDOW_SECONDS` 调整。
 
 ## 后端测试
 

@@ -29,6 +29,7 @@ from .observability import (
     reset_request_id,
     set_request_id,
 )
+from .rate_limit import enforce_generation_rate_limit
 from .schemas import (
     AiGenerationError,
     ApiError,
@@ -136,6 +137,7 @@ def create_app() -> FastAPI:
     )
     async def generate_quiz(
         payload: GenerateQuizRequest,
+        _: None = Depends(enforce_generation_rate_limit),
         service: LearningService = Depends(get_learning_service),
     ) -> GenerateQuizResponse:
         try:
@@ -150,6 +152,7 @@ def create_app() -> FastAPI:
     )
     async def generate_report(
         payload: GenerateReportRequest,
+        _: None = Depends(enforce_generation_rate_limit),
         service: LearningService = Depends(get_learning_service),
     ) -> GenerateReportResponse:
         try:

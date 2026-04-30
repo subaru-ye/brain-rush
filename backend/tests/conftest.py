@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.llm import AiQuizDraft, AiReportDraft
 from app.main import app, get_learning_service
+from app.rate_limit import generation_rate_limiter
 from app.schemas import QuizQuestion, UserAnswer
 from app.services import LearningService
 
@@ -43,6 +44,13 @@ class FakeAiClient:
             weakPoints=["概念理解"] if accuracy < 100 else [],
             suggestions=["复习错题解析", "再挑战一次同主题题目"],
         )
+
+
+@pytest.fixture(autouse=True)
+def clear_rate_limiter():
+    generation_rate_limiter.clear()
+    yield
+    generation_rate_limiter.clear()
 
 
 @pytest.fixture

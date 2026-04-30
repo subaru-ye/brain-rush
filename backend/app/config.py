@@ -18,6 +18,14 @@ class Settings(BaseSettings):
     openai_model: str = Field(default="deepseek-v4-flash", alias="OPENAI_MODEL")
     openai_timeout_seconds: float = Field(default=60.0, alias="OPENAI_TIMEOUT_SECONDS")
     openai_max_retries: int = Field(default=2, alias="OPENAI_MAX_RETRIES")
+    generation_rate_limit_max_requests: int = Field(
+        default=10,
+        alias="GENERATION_RATE_LIMIT_MAX_REQUESTS",
+    )
+    generation_rate_limit_window_seconds: int = Field(
+        default=3600,
+        alias="GENERATION_RATE_LIMIT_WINDOW_SECONDS",
+    )
     frontend_origins: str = Field(default="*", alias="FRONTEND_ORIGINS")
     database_url: str = Field(
         default="postgresql+psycopg://brain_rush:brain_rush@localhost:5432/brain_rush",
