@@ -4,7 +4,8 @@ export default defineAppConfig({
     "pages/quiz/index",
     "pages/report/index",
     "pages/history/index",
-    "pages/history-detail/index"
+    "pages/history-detail/index",
+    "pages/wrong-book/index"
   ],
   window: {
     backgroundTextStyle: "light",

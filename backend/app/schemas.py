@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -151,3 +151,43 @@ class HistorySaveResponse(BaseModel):
 
 class HistoryListResponse(BaseModel):
     records: list[HistoryRecordSummary]
+
+
+QuestionFeedbackReason = Literal["question_inaccurate", "explanation_unclear", "irrelevant"]
+QuestionFeedbackSource = Literal["quiz", "report"]
+
+
+class QuestionFeedbackRequest(BaseModel):
+    sessionId: str = Field(min_length=1, max_length=64)
+    topic: str = Field(min_length=1, max_length=120)
+    questionId: str = Field(min_length=1, max_length=128)
+    reason: QuestionFeedbackReason
+    questionSnapshot: QuizQuestion
+    selectedIndex: int | None = Field(default=None, ge=0, le=3)
+    sourcePage: QuestionFeedbackSource
+
+
+class QuestionFeedbackResponse(BaseModel):
+    id: str
+    createdAt: datetime
+    updatedAt: datetime
+
+
+class WrongQuestionItem(BaseModel):
+    recordId: str
+    sessionId: str
+    topic: str
+    questionId: str
+    stem: str
+    options: list[str]
+    answerIndex: int
+    selectedIndex: int
+    explanation: str
+    knowledgePoint: str
+    userAnswer: str
+    correctAnswer: str
+    completedAt: datetime
+
+
+class WrongQuestionListResponse(BaseModel):
+    items: list[WrongQuestionItem]

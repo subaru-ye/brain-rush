@@ -13,6 +13,7 @@ from .auth import create_auth_token, get_current_user_id
 from .config import get_settings
 from .database import get_db
 from .errors import ApiHttpError
+from .feedback import list_wrong_questions, save_question_feedback
 from .history import (
     get_learning_record,
     list_learning_records,
@@ -42,7 +43,10 @@ from .schemas import (
     HistoryRecordDetail,
     HistorySaveRequest,
     HistorySaveResponse,
+    QuestionFeedbackRequest,
+    QuestionFeedbackResponse,
     WechatLoginRequest,
+    WrongQuestionListResponse,
 )
 from .services import AiServiceError, LearningService
 from .wechat import exchange_wechat_code
@@ -195,6 +199,29 @@ def create_app() -> FastAPI:
         db: Session = Depends(get_db),
     ) -> HistoryRecordDetail:
         return get_learning_record(db, user_id, record_id)
+
+    @app.post(
+        "/api/question-feedback",
+        response_model=QuestionFeedbackResponse,
+        responses={401: {"model": ApiError}},
+    )
+    async def create_question_feedback(
+        payload: QuestionFeedbackRequest,
+        user_id: str = Depends(get_current_user_id),
+        db: Session = Depends(get_db),
+    ) -> QuestionFeedbackResponse:
+        return save_question_feedback(db, user_id, payload)
+
+    @app.get(
+        "/api/wrong-questions",
+        response_model=WrongQuestionListResponse,
+        responses={401: {"model": ApiError}},
+    )
+    async def get_wrong_questions(
+        user_id: str = Depends(get_current_user_id),
+        db: Session = Depends(get_db),
+    ) -> WrongQuestionListResponse:
+        return WrongQuestionListResponse(items=list_wrong_questions(db, user_id))
 
     return app
 

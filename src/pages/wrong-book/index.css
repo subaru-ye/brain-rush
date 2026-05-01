@@ -1,0 +1,109 @@
+.wrong-book-screen {
+  padding: 28px 20px 34px;
+  background:
+    radial-gradient(circle at 88% 14%, rgba(93, 186, 179, 0.22), transparent 24%),
+    linear-gradient(180deg, rgba(255, 253, 244, 0.84), rgba(239, 248, 246, 0.96));
+}
+
+.wrong-book-status {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border: 1px solid rgba(35, 54, 58, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 252, 0.82);
+  box-shadow: 0 12px 28px rgba(49, 90, 89, 0.08);
+}
+
+.wrong-book-count {
+  color: #6f7f7f;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.wrong-book-screen .hero-title {
+  margin: 22px 0 10px;
+  color: #23363a;
+  font-size: 31px;
+  font-weight: 900;
+}
+
+.wrong-book-screen .subcopy {
+  color: #6b7c7c;
+  font-size: 15px;
+}
+
+.wrong-book-actions {
+  margin-top: 20px;
+}
+
+.wrong-question-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.wrong-question-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wrong-question-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  color: #7b8b8b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.wrong-question-point {
+  color: #5aa49d;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.wrong-question-stem {
+  color: #23363a;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.5;
+}
+
+.wrong-answer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wrong-answer-grid view {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(239, 248, 246, 0.84);
+  color: #5f7374;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.wrong-answer-grid view text:last-child {
+  color: #23363a;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.wrong-book-empty {
+  color: #647778;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.7;
+}

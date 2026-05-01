@@ -4,12 +4,76 @@ import Taro, { useLoad } from "@tarojs/taro"
 
 import { ActionButton, Badge } from "@/components/ui"
 import { generateReport, getFriendlyErrorMessage } from "@/services/api"
+import { submitQuestionFeedback } from "@/services/feedback"
 import { saveLearningRecordToHistory } from "@/services/history"
 import { clearCurrentSession, getCurrentSession, saveCurrentSession } from "@/services/session"
-import type { QuizSession, ReviewReport } from "@/types/learning"
+import type {
+  QuestionFeedbackReason,
+  QuizQuestion,
+  QuizSession,
+  ReviewReport,
+  UserAnswer,
+  WrongQuestionReview
+} from "@/types/learning"
 import { getAccuracyPercent, getCorrectCount } from "@/utils/quiz"
 
 import "./index.css"
+
+const feedbackOptions: Array<{ reason: QuestionFeedbackReason; label: string }> = [
+  { reason: "question_inaccurate", label: "题目不准" },
+  { reason: "explanation_unclear", label: "讲解不清楚" },
+  { reason: "irrelevant", label: "不相关" }
+]
+
+function getOptionText(question: QuizQuestion, index: number): string {
+  return question.options[index] || `选项 ${index + 1}`
+}
+
+function buildWrongQuestionReview(
+  question: QuizQuestion,
+  answer: UserAnswer
+): WrongQuestionReview | null {
+  if (answer.selectedIndex === question.answerIndex) {
+    return null
+  }
+
+  return {
+    questionId: question.id,
+    stem: question.stem,
+    userAnswer: getOptionText(question, answer.selectedIndex),
+    correctAnswer: getOptionText(question, question.answerIndex),
+    explanation: question.explanation,
+    knowledgePoint: question.knowledgePoint
+  }
+}
+
+function buildWrongReviewReport(nextSession: QuizSession): ReviewReport {
+  const answersById = new Map(nextSession.answers.map((answer) => [answer.questionId, answer]))
+  const wrongQuestions = nextSession.questions.reduce<WrongQuestionReview[]>((items, question) => {
+    const answer = answersById.get(question.id)
+    if (!answer) return items
+    const review = buildWrongQuestionReview(question, answer)
+    return review ? [...items, review] : items
+  }, [])
+  const correctCount = getCorrectCount(nextSession.questions, nextSession.answers)
+  const accuracy = getAccuracyPercent(nextSession.questions, nextSession.answers)
+  const weakPoints = Array.from(
+    new Set(wrongQuestions.map((item) => item.knowledgePoint).filter(Boolean))
+  )
+
+  return {
+    score: accuracy,
+    accuracy,
+    summary: wrongQuestions.length
+      ? `这轮错题复训答对 ${correctCount} / ${nextSession.questions.length}，建议继续巩固仍错的题。`
+      : "这轮错题复训已经全部答对，薄弱点正在变稳。",
+    weakPoints: weakPoints.length ? weakPoints : ["本轮错题复训已全部答对"],
+    wrongQuestions,
+    suggestions: wrongQuestions.length
+      ? ["回到错题本继续练仍错的题", "把仍错的知识点重新看一遍"]
+      : ["可以回到首页挑战新的学习主题"]
+  }
+}
 
 export default function ReportPage() {
   const [session, setSession] = useState<QuizSession | null>(null)
@@ -17,6 +81,7 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [historyNotice, setHistoryNotice] = useState("")
+  const [feedbackStatus, setFeedbackStatus] = useState<Record<string, string>>({})
 
   useLoad(() => {
     const stored = getCurrentSession()
@@ -38,6 +103,15 @@ export default function ReportPage() {
     setError("")
     setHistoryNotice("")
     try {
+      if (nextSession.mode === "wrong_review") {
+        const localReport = buildWrongReviewReport(nextSession)
+        const storedSession = { ...nextSession, report: localReport }
+        setReport(localReport)
+        setSession(storedSession)
+        saveCurrentSession(storedSession)
+        return
+      }
+
       const response = await generateReport(nextSession.topic, nextSession.questions, nextSession.answers)
       const storedSession = { ...nextSession, report: response.report }
       setReport(response.report)
@@ -58,6 +132,34 @@ export default function ReportPage() {
   function handleRestart() {
     clearCurrentSession()
     Taro.redirectTo({ url: "/pages/index/index" })
+  }
+
+  function openWrongBook() {
+    Taro.navigateTo({ url: "/pages/wrong-book/index" })
+  }
+
+  async function handleFeedbackFromReport(item: WrongQuestionReview, reason: QuestionFeedbackReason) {
+    if (!session) return
+    const question = session.questions.find((value) => value.id === item.questionId)
+    const answer = session.answers.find((value) => value.questionId === item.questionId)
+    if (!question) return
+
+    const statusKey = `${item.questionId}_${reason}`
+    setFeedbackStatus((value) => ({ ...value, [statusKey]: "提交中..." }))
+    try {
+      await submitQuestionFeedback({
+        sessionId: session.sessionId,
+        topic: session.topic,
+        questionId: item.questionId,
+        reason,
+        questionSnapshot: question,
+        selectedIndex: answer?.selectedIndex,
+        sourcePage: "report"
+      })
+      setFeedbackStatus((value) => ({ ...value, [statusKey]: "已收到反馈" }))
+    } catch {
+      setFeedbackStatus((value) => ({ ...value, [statusKey]: "反馈提交失败，请稍后再试" }))
+    }
   }
 
   if (!session) {
@@ -103,6 +205,7 @@ export default function ReportPage() {
   }
 
   const correctCount = getCorrectCount(session.questions, session.answers)
+  const isWrongReviewMode = session.mode === "wrong_review"
   const weakPoints = report.weakPoints.length ? report.weakPoints : ["本轮没有明显薄弱点"]
   const memoryItems = [
     report.summary,
@@ -150,6 +253,25 @@ export default function ReportPage() {
               <View><Text>{item.stem}</Text></View>
               <View className='subcopy'><Text>你的答案：{item.userAnswer}</Text></View>
               <View className='subcopy'><Text>正确答案：{item.correctAnswer}</Text></View>
+              <View className='report-feedback-row'>
+                {feedbackOptions.map((option) => (
+                  <View
+                    key={option.reason}
+                    className='report-feedback-chip'
+                    onClick={() => handleFeedbackFromReport(item, option.reason)}
+                  >
+                    <Text>{option.label}</Text>
+                  </View>
+                ))}
+              </View>
+              {feedbackOptions.map((option) => {
+                const statusKey = `${item.questionId}_${option.reason}`
+                return feedbackStatus[statusKey] ? (
+                  <View key={statusKey} className='report-feedback-notice'>
+                    <Text>{feedbackStatus[statusKey]}</Text>
+                  </View>
+                ) : null
+              })}
             </View>
           ))}
         </View>
@@ -166,8 +288,10 @@ export default function ReportPage() {
       </View>
 
       <View className='report-actions'>
-        <ActionButton tone='primary'>生成海报</ActionButton>
-        <ActionButton tone='secondary' onClick={handleRestart}>再练一轮错题</ActionButton>
+        <ActionButton tone='primary' onClick={handleRestart}>再学新主题</ActionButton>
+        <ActionButton tone='secondary' onClick={openWrongBook}>
+          {isWrongReviewMode ? "回到错题本" : "错题本复训"}
+        </ActionButton>
       </View>
       {historyNotice ? <View className='history-notice'><Text>{historyNotice}</Text></View> : null}
     </View>

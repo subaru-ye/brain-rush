@@ -94,6 +94,32 @@ def test_history_requires_auth(history_client):
     assert response.json()["code"] == "auth_required"
 
 
+def test_question_feedback_requires_auth(history_client):
+    payload = history_payload()
+    response = history_client.post(
+        "/api/question-feedback",
+        json={
+            "sessionId": payload["sessionId"],
+            "topic": payload["topic"],
+            "questionId": "q1",
+            "reason": "question_inaccurate",
+            "questionSnapshot": payload["questions"][0],
+            "selectedIndex": 0,
+            "sourcePage": "quiz",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "auth_required"
+
+
+def test_wrong_questions_requires_auth(history_client):
+    response = history_client.get("/api/wrong-questions")
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "auth_required"
+
+
 def test_create_list_and_get_history_record(history_client):
     headers = auth_headers(history_client)
 
@@ -117,6 +143,27 @@ def test_create_list_and_get_history_record(history_client):
     assert detail_response.json()["questions"][1]["knowledgePoint"] == "Point 2"
 
 
+def test_create_question_feedback_and_deduplicate(history_client):
+    headers = auth_headers(history_client)
+    payload = history_payload()
+    feedback_payload = {
+        "sessionId": payload["sessionId"],
+        "topic": payload["topic"],
+        "questionId": "q2",
+        "reason": "explanation_unclear",
+        "questionSnapshot": payload["questions"][1],
+        "selectedIndex": 0,
+        "sourcePage": "report",
+    }
+
+    first = history_client.post("/api/question-feedback", json=feedback_payload, headers=headers)
+    second = history_client.post("/api/question-feedback", json=feedback_payload, headers=headers)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["id"] == second.json()["id"]
+
+
 def test_history_records_are_user_scoped(history_client):
     user_a_headers = auth_headers(history_client, "user-a")
     user_b_headers = auth_headers(history_client, "user-b")
@@ -131,3 +178,25 @@ def test_history_records_are_user_scoped(history_client):
     user_b_list = history_client.get("/api/history", headers=user_b_headers)
     assert user_b_list.status_code == 200
     assert user_b_list.json()["records"] == []
+
+
+def test_wrong_questions_are_aggregated_and_user_scoped(history_client):
+    user_a_headers = auth_headers(history_client, "user-a")
+    user_b_headers = auth_headers(history_client, "user-b")
+
+    response = history_client.post(
+        "/api/history",
+        json=history_payload(),
+        headers=user_a_headers,
+    )
+    assert response.status_code == 200
+
+    user_a_wrong = history_client.get("/api/wrong-questions", headers=user_a_headers)
+    user_b_wrong = history_client.get("/api/wrong-questions", headers=user_b_headers)
+
+    assert user_a_wrong.status_code == 200
+    assert len(user_a_wrong.json()["items"]) == 1
+    assert user_a_wrong.json()["items"][0]["questionId"] == "q2"
+    assert user_a_wrong.json()["items"][0]["selectedIndex"] == 0
+    assert user_b_wrong.status_code == 200
+    assert user_b_wrong.json()["items"] == []

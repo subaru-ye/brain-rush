@@ -5,10 +5,13 @@ import type {
   GenerateReportResponse,
   HistoryListResponse,
   HistorySaveResponse,
+  QuestionFeedbackRequest,
+  QuestionFeedbackResponse,
   QuizQuestion,
   QuizSession,
   AuthSession,
-  UserAnswer
+  UserAnswer,
+  WrongQuestionListResponse
 } from "@/types/learning"
 
 export type AppErrorCode =
@@ -176,4 +179,15 @@ export function getHistoryRecords(token: string): Promise<HistoryListResponse> {
 
 export function getHistoryRecord(recordId: string, token: string) {
   return getJson<HistorySaveResponse["record"]>(`/api/history/${recordId}`, { token })
+}
+
+export function createQuestionFeedback(
+  payload: QuestionFeedbackRequest,
+  token: string
+): Promise<QuestionFeedbackResponse> {
+  return postJson<QuestionFeedbackResponse>("/api/question-feedback", payload, { token })
+}
+
+export function getWrongQuestions(token: string): Promise<WrongQuestionListResponse> {
+  return getJson<WrongQuestionListResponse>("/api/wrong-questions", { token })
 }

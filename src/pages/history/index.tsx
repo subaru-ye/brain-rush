@@ -42,6 +42,10 @@ export default function HistoryPage() {
     Taro.navigateTo({ url: `/pages/history-detail/index?id=${recordId}` })
   }
 
+  function openWrongBook() {
+    Taro.navigateTo({ url: "/pages/wrong-book/index" })
+  }
+
   function backHome() {
     Taro.redirectTo({ url: "/pages/index/index" })
   }
@@ -53,6 +57,9 @@ export default function HistoryPage() {
         <Badge tone='blue'>{records.length} 条</Badge>
       </View>
       <View className='hero-title'><Text>以前闯过的关，{"\n"}都在这里。</Text></View>
+      <View className='history-actions'>
+        <ActionButton tone='secondary' onClick={openWrongBook}>查看错题本</ActionButton>
+      </View>
 
       {loading ? (
         <Panel tone='soft'>

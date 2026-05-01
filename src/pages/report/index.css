@@ -145,6 +145,33 @@
   color: #d75b51;
 }
 
+.report-feedback-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.report-feedback-chip {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 11px;
+  border: 1px solid rgba(74, 143, 137, 0.22);
+  border-radius: 999px;
+  background: rgba(239, 248, 246, 0.78);
+  color: #5aa49d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.report-feedback-notice {
+  color: #7b8b8b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .poster-card {
   position: relative;
   min-height: 210px;

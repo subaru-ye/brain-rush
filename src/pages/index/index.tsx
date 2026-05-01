@@ -64,6 +64,10 @@ export default function IndexPage() {
     Taro.navigateTo({ url: "/pages/history/index" })
   }
 
+  function handleOpenWrongBook() {
+    Taro.navigateTo({ url: "/pages/wrong-book/index" })
+  }
+
   function handleUseExample(text: string) {
     setInputText(text)
     setError("")
@@ -165,6 +169,9 @@ export default function IndexPage() {
       <View className='history-entry'>
         <ActionButton tone='secondary' onClick={handleOpenHistory}>
           查看历史记录
+        </ActionButton>
+        <ActionButton tone='secondary' onClick={handleOpenWrongBook}>
+          错题本复训
         </ActionButton>
       </View>
     </View>

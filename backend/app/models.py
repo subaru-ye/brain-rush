@@ -31,6 +31,7 @@ class User(Base):
     )
 
     records: Mapped[list["LearningRecord"]] = relationship(back_populates="user")
+    feedback_items: Mapped[list["QuestionFeedback"]] = relationship(back_populates="user")
 
 
 class LearningRecord(Base):
@@ -54,3 +55,35 @@ class LearningRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     user: Mapped[User] = relationship(back_populates="records")
+
+
+class QuestionFeedback(Base):
+    __tablename__ = "question_feedback"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "session_id",
+            "question_id",
+            "reason",
+            name="uq_question_feedback_user_session_question_reason",
+        ),
+        Index("ix_question_feedback_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    topic: Mapped[str] = mapped_column(String(120), nullable=False)
+    question_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    reason: Mapped[str] = mapped_column(String(40), nullable=False)
+    question_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    selected_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_page: Mapped[str] = mapped_column(String(24), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=now_utc,
+        onupdate=now_utc,
+    )
+
+    user: Mapped[User] = relationship(back_populates="feedback_items")

@@ -169,6 +169,34 @@
   line-height: 1.72;
 }
 
+.feedback-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.feedback-chip {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  border: 1px solid rgba(74, 143, 137, 0.22);
+  border-radius: 999px;
+  background: rgba(239, 248, 246, 0.78);
+  color: #5aa49d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.feedback-notice {
+  margin: -4px 0 14px;
+  color: #7b8b8b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .full-explain-link {
   min-height: 48px;
   margin-top: 10px;

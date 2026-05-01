@@ -1,14 +1,24 @@
+import { useState } from "react"
 import { Text, View } from "@tarojs/components"
 import Taro from "@tarojs/taro"
 
 import { ActionButton, Badge } from "@/components/ui"
 import { useQuizSession } from "@/hooks/useQuizSession"
+import { submitQuestionFeedback } from "@/services/feedback"
+import type { QuestionFeedbackReason } from "@/types/learning"
 
 import "./index.css"
 
 const optionLabels = ["A", "B", "C", "D"]
 
+const feedbackOptions: Array<{ reason: QuestionFeedbackReason; label: string }> = [
+  { reason: "question_inaccurate", label: "题目不准" },
+  { reason: "explanation_unclear", label: "讲解不清楚" },
+  { reason: "irrelevant", label: "不相关" }
+]
+
 export default function QuizPage() {
+  const [feedbackStatus, setFeedbackStatus] = useState("")
   const {
     session,
     question,
@@ -22,8 +32,28 @@ export default function QuizPage() {
   } = useQuizSession()
 
   function handleNext() {
+    setFeedbackStatus("")
     if (!goNextQuestion()) {
       Taro.navigateTo({ url: "/pages/report/index" })
+    }
+  }
+
+  async function handleFeedback(reason: QuestionFeedbackReason) {
+    if (!session || !question || selectedIndex === null) return
+    setFeedbackStatus("提交中...")
+    try {
+      await submitQuestionFeedback({
+        sessionId: session.sessionId,
+        topic: session.topic,
+        questionId: question.id,
+        reason,
+        questionSnapshot: question,
+        selectedIndex,
+        sourcePage: "quiz"
+      })
+      setFeedbackStatus("已收到反馈")
+    } catch {
+      setFeedbackStatus("反馈提交失败，请稍后再试")
     }
   }
 
@@ -68,6 +98,18 @@ export default function QuizPage() {
             <Text>正确答案：{optionLabels[question.answerIndex]}，{question.options[question.answerIndex]}</Text>
           </View>
           <View className='explain-copy'><Text>{question.explanation}</Text></View>
+          <View className='feedback-row'>
+            {feedbackOptions.map((item) => (
+              <View
+                key={item.reason}
+                className='feedback-chip'
+                onClick={() => handleFeedback(item.reason)}
+              >
+                <Text>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+          {feedbackStatus ? <View className='feedback-notice'><Text>{feedbackStatus}</Text></View> : null}
           <ActionButton tone='success' onClick={handleNext}>
             {currentIndex >= session.questions.length - 1 ? "生成学习报告" : "下一题"}
           </ActionButton>
