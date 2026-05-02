@@ -221,7 +221,6 @@ export default function ReportPage() {
       </View>
 
       <View className='hero-title'><Text>本次学习报告</Text></View>
-      <View className='subcopy'><Text>报告先给结论，再给重点，避免一屏塞太多信息。</Text></View>
 
       <View className='report-summary-card'>
         <View className='score-ring'><Text>{report.accuracy}%</Text></View>

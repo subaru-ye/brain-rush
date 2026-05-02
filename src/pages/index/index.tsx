@@ -73,21 +73,10 @@ export default function IndexPage() {
     setError("")
   }
 
-  function handleNextSample() {
-    const nextIndex = (sampleIndex + 1) % sampleTopics.length
-    setSampleIndex(nextIndex)
-    handleUseExample(sampleTopics[nextIndex].prompt)
-  }
-
   const activeSample = sampleTopics[sampleIndex]
 
   return (
     <View className='screen index-screen'>
-      <View className='index-toolbar'>
-        <View className='index-mode-pill'><Text>新建学习</Text></View>
-        <View className='index-ready-copy'><Text>已为你准备 {sampleTopics.length} 个示例</Text></View>
-      </View>
-
       <View className='index-hero'>
         <View className='index-hero-copy'>
           <View className='hero-title'><Text>想学什么？</Text></View>
@@ -134,37 +123,6 @@ export default function IndexPage() {
       <ActionButton tone='primary' loading={loading} disabled={loading} onClick={handleGenerate}>
         {loading ? "正在生成题目..." : "开始生成"}
       </ActionButton>
-
-      <View className='sample-switch' onClick={handleNextSample}>
-        <Text>换个示例</Text>
-      </View>
-
-      <View className='progress-card'>
-        <View className='progress-card-title'><Text>生成进度</Text></View>
-        <View className='soft-progress'>
-          <View className={`soft-progress-fill ${loading ? "is-loading" : ""}`} />
-        </View>
-        <View className='progress-steps'>
-          <View><Text>已清洗输入</Text></View>
-          <View><Text>{loading ? "正在出题" : "准备出题"}</Text></View>
-          <View><Text>准备返回</Text></View>
-        </View>
-      </View>
-
-      <View className='index-stats'>
-        <View className='index-stat'>
-          <View className='index-stat-number'><Text>5题</Text></View>
-          <View className='index-stat-label'><Text>默认题量</Text></View>
-        </View>
-        <View className='index-stat'>
-          <View className='index-stat-number'><Text>3类</Text></View>
-          <View className='index-stat-label'><Text>题型组合</Text></View>
-        </View>
-        <View className='index-stat'>
-          <View className='index-stat-number'><Text>1份</Text></View>
-          <View className='index-stat-label'><Text>学习报告</Text></View>
-        </View>
-      </View>
 
       <View className='history-entry'>
         <ActionButton tone='secondary' onClick={handleOpenHistory}>

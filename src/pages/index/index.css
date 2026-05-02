@@ -7,44 +7,12 @@
     linear-gradient(180deg, rgba(255, 253, 244, 0.66), rgba(241, 249, 245, 0.9));
 }
 
-.index-toolbar {
-  display: flex;
-  min-height: 52px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 9px 14px;
-  border: 1px solid rgba(32, 29, 24, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 253, 244, 0.84);
-  box-shadow: 0 14px 34px rgba(49, 90, 89, 0.1);
-  backdrop-filter: blur(8px);
-}
-
-.index-mode-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 7px 13px;
-  border-radius: 999px;
-  background: #fff0bf;
-  color: #655329;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.index-ready-copy {
-  color: #687574;
-  font-size: 13px;
-  font-weight: 800;
-}
-
 .index-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 72px;
   gap: 16px;
   align-items: center;
-  margin-top: 22px;
+  margin-top: 4px;
 }
 
 .index-hero .hero-title {
@@ -228,103 +196,6 @@
   color: #5aa49d;
   background: rgba(255, 255, 252, 0.78);
   box-shadow: 0 12px 28px rgba(49, 90, 89, 0.1);
-}
-
-.sample-switch {
-  display: flex;
-  min-height: 54px;
-  align-items: center;
-  justify-content: center;
-  margin-top: 10px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(230, 247, 243, 0.9), rgba(238, 249, 247, 0.34));
-  color: #5aa49d;
-  font-size: 16px;
-  font-weight: 900;
-}
-
-.progress-card {
-  margin-top: 10px;
-  padding: 18px 18px 20px;
-  border: 1px solid rgba(32, 29, 24, 0.1);
-  border-radius: 26px;
-  background: rgba(255, 255, 252, 0.9);
-  box-shadow: 0 18px 38px rgba(49, 90, 89, 0.1);
-}
-
-.progress-card-title {
-  color: #23363a;
-  font-size: 20px;
-  font-weight: 900;
-}
-
-.soft-progress {
-  height: 12px;
-  margin-top: 12px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e5f0ee;
-}
-
-.soft-progress-fill {
-  width: 70%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #55afa8 0%, #94c9f5 100%);
-  transition: width 240ms ease;
-}
-
-.soft-progress-fill.is-loading {
-  width: 88%;
-}
-
-.progress-steps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.progress-steps view {
-  min-height: 34px;
-  padding: 8px 6px;
-  border-radius: 999px;
-  background: #f3f7f4;
-  color: #7b8b8b;
-  font-size: 12px;
-  font-weight: 800;
-  text-align: center;
-}
-
-.index-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.index-stat {
-  min-height: 84px;
-  padding: 12px 8px;
-  border: 1px solid rgba(32, 29, 24, 0.08);
-  border-radius: 18px;
-  background: rgba(255, 255, 252, 0.58);
-  text-align: center;
-}
-
-.index-stat-number {
-  color: #5aa49d;
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 900;
-  line-height: 1.1;
-}
-
-.index-stat-label {
-  margin-top: 8px;
-  color: #748382;
-  font-size: 12px;
-  font-weight: 900;
 }
 
 .index-screen .history-entry {
