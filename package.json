@@ -4,8 +4,9 @@
   "private": true,
   "description": "AI 闯关学习微信小程序 MVP",
   "scripts": {
-    "dev:weapp": "taro build --type weapp --watch",
-    "build:weapp": "taro build --type weapp",
+    "dev:weapp": "set TARO_APP_API_BASE_URL=http://127.0.0.1:8000&& taro build --type weapp --watch",
+    "build:weapp": "set TARO_APP_API_BASE_URL=http://127.0.0.1:8000&& taro build --type weapp",
+    "build:weapp:custom": "taro build --type weapp",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

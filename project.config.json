@@ -20,6 +20,8 @@
     "localPlugins": false,
     "disableUseStrict": false,
     "useCompilerPlugins": false,
+    "preloadAssets": false,
+    "precompile": false,
     "condition": false,
     "swc": false,
     "disableSWC": true,
