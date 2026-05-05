@@ -38,6 +38,13 @@ AUTH_TOKEN_SECRET=change-me-in-production
 .\backend\scripts\init-db.ps1
 ```
 
+数据库 schema 由 Alembic 管理，`init-db.ps1` 会执行 `alembic upgrade head`。
+如果已有数据库已经人工确认等价于当前 schema，可以只标记一次版本：
+
+```powershell
+.\backend\scripts\stamp-db.ps1
+```
+
 填好 `backend\.env` 后启动：
 
 ```powershell

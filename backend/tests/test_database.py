@@ -1,39 +1,27 @@
 from __future__ import annotations
 
-from sqlalchemy import create_engine, inspect, text
+from pathlib import Path
 
-from app.database import ensure_learning_record_version_columns
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 
 
-def test_init_database_adds_missing_learning_record_version_columns():
-    engine = create_engine("sqlite+pysqlite:///:memory:")
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                """
-                CREATE TABLE learning_records (
-                    id VARCHAR(32) PRIMARY KEY,
-                    user_id VARCHAR(32) NOT NULL,
-                    session_id VARCHAR(64) NOT NULL,
-                    topic VARCHAR(120) NOT NULL,
-                    questions_json JSON NOT NULL,
-                    answers_json JSON NOT NULL,
-                    report_json JSON NOT NULL,
-                    score INTEGER NOT NULL,
-                    total INTEGER NOT NULL,
-                    accuracy_percent INTEGER NOT NULL,
-                    completed_at TIMESTAMP NOT NULL,
-                    created_at TIMESTAMP NOT NULL
-                )
-                """
-            )
-        )
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
-    ensure_learning_record_version_columns(engine)
-    ensure_learning_record_version_columns(engine)
 
-    columns = {column["name"] for column in inspect(engine).get_columns("learning_records")}
-    assert "quiz_prompt_version" in columns
-    assert "quiz_model_name" in columns
-    assert "report_prompt_version" in columns
-    assert "report_model_name" in columns
+def test_alembic_current_schema_revision_is_registered():
+    config = Config(str(BACKEND_ROOT / "alembic.ini"))
+    script = ScriptDirectory.from_config(config)
+
+    assert script.get_heads() == ["0001_current_schema"]
+
+
+def test_alembic_current_schema_revision_mentions_tracked_tables():
+    revision_file = BACKEND_ROOT / "alembic" / "versions" / "0001_current_schema.py"
+    revision_source = revision_file.read_text(encoding="utf-8")
+
+    assert '"users"' in revision_source
+    assert '"learning_records"' in revision_source
+    assert '"question_feedback"' in revision_source
+    assert '"quiz_prompt_version"' in revision_source
+    assert '"report_model_name"' in revision_source
