@@ -7,6 +7,7 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 from .llm import AiClientError, AiQuizDraft, AiReportDraft
+from .prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
 from .schemas import (
     GenerateQuizResponse,
     GenerateReportRequest,
@@ -50,6 +51,8 @@ class LearningService:
                 sessionId=uuid4().hex,
                 topic=draft.topic.strip(),
                 questions=draft.questions,
+                quizPromptVersion=getattr(self.ai_client, "quiz_prompt_version", QUIZ_PROMPT_VERSION),
+                quizModelName=getattr(self.ai_client, "model_name", ""),
             )
         except AiClientError as exc:
             raise AiServiceError(exc.code, exc.detail) from exc
@@ -91,7 +94,15 @@ class LearningService:
             wrongQuestions=self._build_wrong_question_reviews(request, question_by_id),
             suggestions=draft.suggestions,
         )
-        return GenerateReportResponse(report=report)
+        return GenerateReportResponse(
+            report=report,
+            reportPromptVersion=getattr(
+                self.ai_client,
+                "report_prompt_version",
+                REPORT_PROMPT_VERSION,
+            ),
+            reportModelName=getattr(self.ai_client, "model_name", ""),
+        )
 
     @staticmethod
     def _is_answer_correct(question: QuizQuestion, answer: UserAnswer) -> bool:

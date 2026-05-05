@@ -17,7 +17,12 @@ from pydantic import BaseModel, Field, ValidationError
 
 from .config import Settings
 from .observability import log_event
-from .prompts import build_quiz_prompt, build_report_prompt
+from .prompts import (
+    QUIZ_PROMPT_VERSION,
+    REPORT_PROMPT_VERSION,
+    build_quiz_prompt,
+    build_report_prompt,
+)
 from .schemas import QuizQuestion, UserAnswer
 
 
@@ -70,6 +75,8 @@ class LangChainAiClient:
         self.base_url = settings.openai_base_url
         self.timeout_seconds = settings.openai_timeout_seconds
         self.max_retries = settings.openai_max_retries
+        self.quiz_prompt_version = QUIZ_PROMPT_VERSION
+        self.report_prompt_version = REPORT_PROMPT_VERSION
         self.llm = llm or ChatOpenAI(
             api_key=settings.openai_api_key,
             base_url=self.base_url,
@@ -82,6 +89,7 @@ class LangChainAiClient:
     def generate_quiz(self, input_text: str) -> AiQuizDraft:
         return self._invoke_structured_prompt(
             operation="generate_quiz",
+            prompt_version=self.quiz_prompt_version,
             prompt=build_quiz_prompt(),
             payload={"input_text": input_text},
             model=AiQuizDraft,
@@ -111,6 +119,7 @@ class LangChainAiClient:
 
         return self._invoke_structured_prompt(
             operation="generate_report",
+            prompt_version=self.report_prompt_version,
             prompt=build_report_prompt(),
             payload={
                 "topic": topic,
@@ -125,6 +134,7 @@ class LangChainAiClient:
         self,
         *,
         operation: str,
+        prompt_version: str,
         prompt: Any,
         payload: dict[str, Any],
         model: type[TModel],
@@ -149,6 +159,7 @@ class LangChainAiClient:
             log_event(
                 "ai_call_failed",
                 operation=operation,
+                prompt_version=prompt_version,
                 model=self.model_name,
                 base_url=self.base_url,
                 timeout_seconds=self.timeout_seconds,
@@ -163,6 +174,7 @@ class LangChainAiClient:
         log_event(
             "ai_call_completed",
             operation=operation,
+            prompt_version=prompt_version,
             model=self.model_name,
             base_url=self.base_url,
             timeout_seconds=self.timeout_seconds,

@@ -5,6 +5,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
+
 
 TextInput = Annotated[str, Field(min_length=2, max_length=4000)]
 
@@ -48,6 +50,8 @@ class GenerateQuizResponse(BaseModel):
     sessionId: str
     topic: str
     questions: list[QuizQuestion] = Field(min_length=5, max_length=5)
+    quizPromptVersion: str = Field(default=QUIZ_PROMPT_VERSION, max_length=40)
+    quizModelName: str = Field(default="", max_length=120)
 
 
 class UserAnswer(BaseModel):
@@ -91,6 +95,8 @@ class ReviewReport(BaseModel):
 
 class GenerateReportResponse(BaseModel):
     report: ReviewReport
+    reportPromptVersion: str = Field(default=REPORT_PROMPT_VERSION, max_length=40)
+    reportModelName: str = Field(default="", max_length=120)
 
 
 class AiGenerationError(BaseModel):
@@ -118,6 +124,10 @@ class HistorySaveRequest(BaseModel):
     questions: list[QuizQuestion] = Field(min_length=1, max_length=20)
     answers: list[UserAnswer] = Field(min_length=1, max_length=20)
     report: ReviewReport
+    quizPromptVersion: str | None = Field(default=None, max_length=40)
+    quizModelName: str | None = Field(default=None, max_length=120)
+    reportPromptVersion: str | None = Field(default=None, max_length=40)
+    reportModelName: str | None = Field(default=None, max_length=120)
 
     @model_validator(mode="after")
     def validate_answer_references(self) -> "HistorySaveRequest":
@@ -135,6 +145,10 @@ class HistoryRecordSummary(BaseModel):
     score: int
     total: int
     accuracy: int
+    quizPromptVersion: str | None = None
+    quizModelName: str | None = None
+    reportPromptVersion: str | None = None
+    reportModelName: str | None = None
     completedAt: datetime
     createdAt: datetime
 

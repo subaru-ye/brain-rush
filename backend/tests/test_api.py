@@ -74,6 +74,8 @@ def test_generate_quiz_returns_five_valid_questions(client):
     assert len(data["questions"]) == 5
     assert data["questions"][0]["answerIndex"] == 0
     assert data["questions"][0]["explanation"]
+    assert data["quizPromptVersion"] == "quiz-test-v1"
+    assert data["quizModelName"] == "fake-model"
 
 
 def test_generate_quiz_is_rate_limited_by_ip_and_path(client):
@@ -181,6 +183,8 @@ def test_generate_report_returns_programmatic_score(client):
     assert len(report["wrongQuestions"]) == 1
     assert report["wrongQuestions"][0]["questionId"] == "q2"
     assert report["suggestions"]
+    assert response.json()["reportPromptVersion"] == "report-test-v1"
+    assert response.json()["reportModelName"] == "fake-model"
 
 
 def test_generate_report_recomputes_score_when_frontend_is_correct_is_wrong(client):

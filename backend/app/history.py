@@ -5,8 +5,10 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .config import get_settings
 from .errors import ApiHttpError
 from .models import LearningRecord, User, now_utc
+from .prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
 from .schemas import (
     HistoryRecordDetail,
     HistoryRecordSummary,
@@ -45,6 +47,7 @@ def save_learning_record(
         record = LearningRecord(user_id=user_id, session_id=payload.sessionId)
         db.add(record)
 
+    model_name = get_settings().openai_model
     record.topic = payload.topic
     record.questions_json = [question.model_dump() for question in payload.questions]
     record.answers_json = [answer.model_dump() for answer in payload.answers]
@@ -52,6 +55,10 @@ def save_learning_record(
     record.score = score
     record.total = total
     record.accuracy_percent = accuracy
+    record.quiz_prompt_version = payload.quizPromptVersion or QUIZ_PROMPT_VERSION
+    record.quiz_model_name = payload.quizModelName or model_name
+    record.report_prompt_version = payload.reportPromptVersion or REPORT_PROMPT_VERSION
+    record.report_model_name = payload.reportModelName or model_name
     record.completed_at = now_utc()
 
     db.commit()
@@ -97,6 +104,10 @@ def to_summary(record: LearningRecord) -> HistoryRecordSummary:
         score=record.score,
         total=record.total,
         accuracy=record.accuracy_percent,
+        quizPromptVersion=record.quiz_prompt_version,
+        quizModelName=record.quiz_model_name,
+        reportPromptVersion=record.report_prompt_version,
+        reportModelName=record.report_model_name,
         completedAt=ensure_datetime(record.completed_at),
         createdAt=ensure_datetime(record.created_at),
     )

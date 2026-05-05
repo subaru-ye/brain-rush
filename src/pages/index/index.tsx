@@ -50,7 +50,9 @@ export default function IndexPage() {
         sessionId: quiz.sessionId,
         topic: quiz.topic,
         questions: quiz.questions,
-        answers: []
+        answers: [],
+        quizPromptVersion: quiz.quizPromptVersion,
+        quizModelName: quiz.quizModelName
       })
       await Taro.navigateTo({ url: "/pages/quiz/index" })
     } catch (err) {

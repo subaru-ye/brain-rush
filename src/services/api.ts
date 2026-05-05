@@ -169,7 +169,11 @@ export function createHistoryRecord(
     topic: session.topic,
     questions: session.questions,
     answers: session.answers,
-    report: session.report
+    report: session.report,
+    quizPromptVersion: session.quizPromptVersion,
+    quizModelName: session.quizModelName,
+    reportPromptVersion: session.reportPromptVersion,
+    reportModelName: session.reportModelName
   }, { token })
 }
 

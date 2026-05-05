@@ -3,6 +3,9 @@ from __future__ import annotations
 from langchain_core.prompts import ChatPromptTemplate
 
 
+QUIZ_PROMPT_VERSION = "quiz-v1"
+REPORT_PROMPT_VERSION = "report-v1"
+
 QUIZ_SYSTEM_PROMPT = (
     "You are a Chinese learning coach for a mobile quiz app. "
     "Turn the user's study material into concise, accurate single-choice questions. "

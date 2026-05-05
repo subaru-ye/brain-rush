@@ -7,6 +7,7 @@ from sqlalchemy import DateTime, ForeignKey, Index, Integer, JSON, String, Uniqu
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
+from .prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
 
 
 def now_utc() -> datetime:
@@ -51,6 +52,18 @@ class LearningRecord(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     total: Mapped[int] = mapped_column(Integer, nullable=False)
     accuracy_percent: Mapped[int] = mapped_column(Integer, nullable=False)
+    quiz_prompt_version: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+        default=QUIZ_PROMPT_VERSION,
+    )
+    quiz_model_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    report_prompt_version: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+        default=REPORT_PROMPT_VERSION,
+    )
+    report_model_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 

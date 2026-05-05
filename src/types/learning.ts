@@ -11,6 +11,8 @@ export interface GenerateQuizResponse {
   sessionId: string
   topic: string
   questions: QuizQuestion[]
+  quizPromptVersion?: string
+  quizModelName?: string
 }
 
 export interface UserAnswer {
@@ -40,6 +42,8 @@ export interface ReviewReport {
 
 export interface GenerateReportResponse {
   report: ReviewReport
+  reportPromptVersion?: string
+  reportModelName?: string
 }
 
 export type QuizSessionMode = "normal" | "wrong_review"
@@ -51,6 +55,10 @@ export interface QuizSession {
   answers: UserAnswer[]
   report?: ReviewReport
   mode?: QuizSessionMode
+  quizPromptVersion?: string
+  quizModelName?: string
+  reportPromptVersion?: string
+  reportModelName?: string
 }
 
 export interface AuthSession {
@@ -65,6 +73,10 @@ export interface LearningRecordSummary {
   score: number
   total: number
   accuracy: number
+  quizPromptVersion?: string
+  quizModelName?: string
+  reportPromptVersion?: string
+  reportModelName?: string
   completedAt: string
   createdAt: string
 }

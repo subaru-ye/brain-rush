@@ -13,6 +13,9 @@ from app.services import LearningService
 class FakeAiClient:
     def __init__(self, mode: str = "ok"):
         self.mode = mode
+        self.model_name = "fake-model"
+        self.quiz_prompt_version = "quiz-test-v1"
+        self.report_prompt_version = "report-test-v1"
 
     def generate_quiz(self, input_text: str) -> AiQuizDraft:
         if self.mode == "invalid_quiz":

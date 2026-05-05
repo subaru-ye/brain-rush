@@ -113,7 +113,12 @@ export default function ReportPage() {
       }
 
       const response = await generateReport(nextSession.topic, nextSession.questions, nextSession.answers)
-      const storedSession = { ...nextSession, report: response.report }
+      const storedSession = {
+        ...nextSession,
+        report: response.report,
+        reportPromptVersion: response.reportPromptVersion,
+        reportModelName: response.reportModelName
+      }
       setReport(response.report)
       setSession(storedSession)
       saveCurrentSession(storedSession)

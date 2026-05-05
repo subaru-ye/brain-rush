@@ -7,8 +7,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import main as main_module
+from app.config import get_settings
 from app.database import Base
 from app import models  # noqa: F401
+from app.prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
 
 
 @pytest.fixture
@@ -40,7 +42,7 @@ def auth_headers(client: TestClient, code: str = "dev-code") -> dict[str, str]:
     return {"Authorization": f"Bearer {response.json()['token']}"}
 
 
-def history_payload(session_id: str = "session-1") -> dict:
+def history_payload(session_id: str = "session-1", include_versions: bool = False) -> dict:
     questions = [
         {
             "id": "q1",
@@ -59,7 +61,7 @@ def history_payload(session_id: str = "session-1") -> dict:
             "knowledgePoint": "Point 2",
         },
     ]
-    return {
+    payload = {
         "sessionId": session_id,
         "topic": "AI Agent",
         "questions": questions,
@@ -85,6 +87,16 @@ def history_payload(session_id: str = "session-1") -> dict:
             "suggestions": ["Review"],
         },
     }
+    if include_versions:
+        payload.update(
+            {
+                "quizPromptVersion": "quiz-exp-v2",
+                "quizModelName": "quiz-model-test",
+                "reportPromptVersion": "report-exp-v2",
+                "reportModelName": "report-model-test",
+            }
+        )
+    return payload
 
 
 def test_history_requires_auth(history_client):
@@ -125,7 +137,7 @@ def test_create_list_and_get_history_record(history_client):
 
     create_response = history_client.post(
         "/api/history",
-        json=history_payload(),
+        json=history_payload(include_versions=True),
         headers=headers,
     )
     assert create_response.status_code == 200
@@ -133,6 +145,10 @@ def test_create_list_and_get_history_record(history_client):
     assert record["topic"] == "AI Agent"
     assert record["score"] == 50
     assert record["accuracy"] == 50
+    assert record["quizPromptVersion"] == "quiz-exp-v2"
+    assert record["quizModelName"] == "quiz-model-test"
+    assert record["reportPromptVersion"] == "report-exp-v2"
+    assert record["reportModelName"] == "report-model-test"
 
     list_response = history_client.get("/api/history", headers=headers)
     assert list_response.status_code == 200
@@ -141,6 +157,24 @@ def test_create_list_and_get_history_record(history_client):
     detail_response = history_client.get(f"/api/history/{record['id']}", headers=headers)
     assert detail_response.status_code == 200
     assert detail_response.json()["questions"][1]["knowledgePoint"] == "Point 2"
+    assert detail_response.json()["quizPromptVersion"] == "quiz-exp-v2"
+
+
+def test_history_save_uses_current_versions_for_legacy_payload(history_client):
+    headers = auth_headers(history_client)
+
+    response = history_client.post(
+        "/api/history",
+        json=history_payload("legacy-session"),
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    record = response.json()["record"]
+    assert record["quizPromptVersion"] == QUIZ_PROMPT_VERSION
+    assert record["quizModelName"] == get_settings().openai_model
+    assert record["reportPromptVersion"] == REPORT_PROMPT_VERSION
+    assert record["reportModelName"] == get_settings().openai_model
 
 
 def test_create_question_feedback_and_deduplicate(history_client):
