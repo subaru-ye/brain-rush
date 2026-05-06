@@ -99,6 +99,11 @@
   background: #eef8ef;
 }
 
+.quiz-screen .option.selected {
+  border-color: rgba(85, 184, 175, 0.38);
+  background: #eef8f6;
+}
+
 .quiz-screen .option.wrong {
   border-color: rgba(242, 91, 82, 0.22);
   background: #fff0eb;

@@ -6,13 +6,15 @@ import type { QuizSession } from "@/types/learning"
 import {
   createUserAnswer,
   findFirstUnansweredIndex,
-  isAnswerCorrect
+  getAnswerIndexes,
+  getQuestionType,
+  isAnswerCorrectByIndexes
 } from "@/utils/quiz"
 
 export function useQuizSession() {
   const [session, setSession] = useState<QuizSession | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const [selectedIndexes, setSelectedIndexes] = useState<number[]>([])
   const [answered, setAnswered] = useState(false)
   const [startedAt, setStartedAt] = useState(Date.now())
 
@@ -34,16 +36,37 @@ export function useQuizSession() {
     return Math.round(((currentIndex + (answered ? 1 : 0)) / session.questions.length) * 100)
   }, [answered, currentIndex, session])
 
+  const isMultipleChoice = question ? getQuestionType(question) === "multiple_choice" : false
+
   function selectAnswer(index: number) {
     if (!session || !question || answered) return
+    if (isMultipleChoice) {
+      setSelectedIndexes((value) => (
+        value.includes(index)
+          ? value.filter((item) => item !== index)
+          : [...value, index].sort((a, b) => a - b)
+      ))
+      return
+    }
 
-    const nextAnswer = createUserAnswer(question, index, startedAt)
+    submitAnswer([index])
+  }
+
+  function submitSelectedAnswer() {
+    if (!selectedIndexes.length) return
+    submitAnswer(selectedIndexes)
+  }
+
+  function submitAnswer(indexes: number[]) {
+    if (!session || !question || answered) return
+
+    const nextAnswer = createUserAnswer(question, indexes, startedAt)
     const answers = [
       ...session.answers.filter((answer) => answer.questionId !== question.id),
       nextAnswer
     ]
     const nextSession = { ...session, answers }
-    setSelectedIndex(index)
+    setSelectedIndexes(nextAnswer.selectedIndexes || [])
     setAnswered(true)
     setSession(nextSession)
     saveCurrentSession(nextSession)
@@ -55,16 +78,17 @@ export function useQuizSession() {
       return false
     }
     setCurrentIndex((value) => value + 1)
-    setSelectedIndex(null)
+    setSelectedIndexes([])
     setAnswered(false)
     setStartedAt(Date.now())
     return true
   }
 
   function getOptionClass(index: number) {
-    if (!answered) return "option"
-    if (question && isAnswerCorrect(question, index)) return "option correct"
-    if (index === selectedIndex) return "option wrong"
+    const selected = selectedIndexes.includes(index)
+    if (!answered) return selected ? "option selected" : "option"
+    if (question && getAnswerIndexes(question).includes(index)) return "option correct"
+    if (selected) return "option wrong"
     return "option muted"
   }
 
@@ -72,10 +96,14 @@ export function useQuizSession() {
     session,
     question,
     currentIndex,
-    selectedIndex,
+    selectedIndex: selectedIndexes[0] ?? null,
+    selectedIndexes,
     answered,
     progress,
+    isMultipleChoice,
+    isSelectedCorrect: question ? isAnswerCorrectByIndexes(question, selectedIndexes) : false,
     selectAnswer,
+    submitSelectedAnswer,
     goNextQuestion,
     getOptionClass
   }

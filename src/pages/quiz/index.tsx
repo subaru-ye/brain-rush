@@ -6,6 +6,7 @@ import { ActionButton, Badge } from "@/components/ui"
 import { useQuizSession } from "@/hooks/useQuizSession"
 import { submitQuestionFeedback } from "@/services/feedback"
 import type { QuestionFeedbackReason } from "@/types/learning"
+import { formatAnswerText, getAnswerIndexes, getQuestionType } from "@/utils/quiz"
 
 import "./index.css"
 
@@ -17,16 +18,24 @@ const feedbackOptions: Array<{ reason: QuestionFeedbackReason; label: string }> 
   { reason: "irrelevant", label: "不相关" }
 ]
 
+const questionTypeLabels = {
+  single_choice: "单选题",
+  multiple_choice: "多选题",
+  true_false: "判断题"
+}
+
 export default function QuizPage() {
   const [feedbackStatus, setFeedbackStatus] = useState("")
   const {
     session,
     question,
     currentIndex,
-    selectedIndex,
+    selectedIndexes,
     answered,
-    progress,
+    isMultipleChoice,
+    isSelectedCorrect,
     selectAnswer,
+    submitSelectedAnswer,
     goNextQuestion,
     getOptionClass
   } = useQuizSession()
@@ -39,7 +48,7 @@ export default function QuizPage() {
   }
 
   async function handleFeedback(reason: QuestionFeedbackReason) {
-    if (!session || !question || selectedIndex === null) return
+    if (!session || !question || !selectedIndexes.length) return
     setFeedbackStatus("提交中...")
     try {
       await submitQuestionFeedback({
@@ -48,7 +57,8 @@ export default function QuizPage() {
         questionId: question.id,
         reason,
         questionSnapshot: question,
-        selectedIndex,
+        selectedIndex: selectedIndexes[0],
+        selectedIndexes,
         sourcePage: "quiz"
       })
       setFeedbackStatus("已收到反馈")
@@ -65,7 +75,8 @@ export default function QuizPage() {
     )
   }
 
-  const isCorrect = selectedIndex === question.answerIndex
+  const answerIndexes = getAnswerIndexes(question)
+  const questionType = getQuestionType(question)
 
   return (
     <View className='screen quiz-screen'>
@@ -75,27 +86,35 @@ export default function QuizPage() {
       </View>
 
       <View className='question-card'>
-        <View className='question-chip'><Text>{question.options.length > 1 ? "单选题" : "判断题"}</Text></View>
+        <View className='question-chip'><Text>{questionTypeLabels[questionType]}</Text></View>
         <View className='question-title'><Text>{question.stem}</Text></View>
-        <View className='question-tip'><Text>请选择一个你认为最准确的答案。</Text></View>
+        <View className='question-tip'>
+          <Text>{isMultipleChoice ? "请选择所有正确答案，确认后查看解析。" : "请选择一个你认为最准确的答案。"}</Text>
+        </View>
       </View>
 
       <View className='option-list'>
         {question.options.map((option, index) => (
-          <View key={option} className={getOptionClass(index)} onClick={() => selectAnswer(index)}>
+          <View key={`${index}_${option}`} className={getOptionClass(index)} onClick={() => selectAnswer(index)}>
             <View className='option-mark'><Text>{optionLabels[index]}</Text></View>
             <View className='option-text'><Text>{option}</Text></View>
-            {answered && index === question.answerIndex ? <View className='option-result correct-mark'><Text>✓</Text></View> : null}
-            {answered && index === selectedIndex && !isCorrect ? <View className='option-result wrong-mark'><Text>×</Text></View> : null}
+            {answered && answerIndexes.includes(index) ? <View className='option-result correct-mark'><Text>✓</Text></View> : null}
+            {answered && selectedIndexes.includes(index) && !answerIndexes.includes(index) ? <View className='option-result wrong-mark'><Text>×</Text></View> : null}
           </View>
         ))}
       </View>
+
+      {isMultipleChoice && !answered ? (
+        <ActionButton tone='primary' disabled={!selectedIndexes.length} onClick={submitSelectedAnswer}>
+          确认答案
+        </ActionButton>
+      ) : null}
 
       {answered ? (
         <View className='answer-card'>
           <View className='answer-card-title'><Text>答案讲解</Text></View>
           <View className='answer-line'>
-            <Text>正确答案：{optionLabels[question.answerIndex]}，{question.options[question.answerIndex]}</Text>
+            <Text>{isSelectedCorrect ? "答对了：" : "正确答案："}{formatAnswerText(question, answerIndexes)}</Text>
           </View>
           <View className='explain-copy'><Text>{question.explanation}</Text></View>
           <View className='feedback-row'>

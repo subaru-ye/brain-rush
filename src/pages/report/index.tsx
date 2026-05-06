@@ -15,7 +15,14 @@ import type {
   UserAnswer,
   WrongQuestionReview
 } from "@/types/learning"
-import { getAccuracyPercent, getCorrectCount } from "@/utils/quiz"
+import {
+  formatAnswerText,
+  getAccuracyPercent,
+  getAnswerIndexes,
+  getCorrectCount,
+  getSelectedIndexes,
+  isAnswerCorrect
+} from "@/utils/quiz"
 
 import "./index.css"
 
@@ -33,15 +40,15 @@ function buildWrongQuestionReview(
   question: QuizQuestion,
   answer: UserAnswer
 ): WrongQuestionReview | null {
-  if (answer.selectedIndex === question.answerIndex) {
+  if (isAnswerCorrect(question, answer)) {
     return null
   }
 
   return {
     questionId: question.id,
     stem: question.stem,
-    userAnswer: getOptionText(question, answer.selectedIndex),
-    correctAnswer: getOptionText(question, question.answerIndex),
+    userAnswer: formatAnswerText(question, getSelectedIndexes(answer)),
+    correctAnswer: formatAnswerText(question, getAnswerIndexes(question)),
     explanation: question.explanation,
     knowledgePoint: question.knowledgePoint
   }
@@ -159,6 +166,7 @@ export default function ReportPage() {
         reason,
         questionSnapshot: question,
         selectedIndex: answer?.selectedIndex,
+        selectedIndexes: answer?.selectedIndexes,
         sourcePage: "report"
       })
       setFeedbackStatus((value) => ({ ...value, [statusKey]: "已收到反馈" }))

@@ -2,7 +2,9 @@ export interface QuizQuestion {
   id: string
   stem: string
   options: string[]
-  answerIndex: number
+  answerIndex?: number
+  answerIndexes?: number[]
+  questionType?: "single_choice" | "multiple_choice" | "true_false"
   explanation: string
   knowledgePoint: string
   sourceType?: string
@@ -21,7 +23,8 @@ export interface GenerateQuizResponse {
 
 export interface UserAnswer {
   questionId: string
-  selectedIndex: number
+  selectedIndex?: number
+  selectedIndexes?: number[]
   isCorrect: boolean
   elapsedMs?: number
 }
@@ -115,6 +118,7 @@ export interface QuestionFeedbackRequest {
   reason: QuestionFeedbackReason
   questionSnapshot: QuizQuestion
   selectedIndex?: number
+  selectedIndexes?: number[]
   sourcePage: QuestionFeedbackSource
 }
 
@@ -129,10 +133,13 @@ export interface WrongQuestionItem {
   sessionId: string
   topic: string
   questionId: string
+  questionType?: "single_choice" | "multiple_choice" | "true_false"
   stem: string
   options: string[]
-  answerIndex: number
-  selectedIndex: number
+  answerIndex?: number
+  answerIndexes?: number[]
+  selectedIndex?: number
+  selectedIndexes?: number[]
   explanation: string
   knowledgePoint: string
   userAnswer: string

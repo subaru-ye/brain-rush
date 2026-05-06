@@ -15,6 +15,10 @@ export function createWrongReviewSession(items: WrongQuestionItem[]): QuizSessio
     stem: item.stem,
     options: item.options,
     answerIndex: item.answerIndex,
+    answerIndexes: item.answerIndexes?.length ? item.answerIndexes : (
+      item.answerIndex !== undefined ? [item.answerIndex] : []
+    ),
+    questionType: item.questionType,
     explanation: item.explanation,
     knowledgePoint: item.knowledgePoint
   }))
