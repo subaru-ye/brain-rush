@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -64,10 +64,72 @@ class LearningRecord(Base):
         default=REPORT_PROMPT_VERSION,
     )
     report_model_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    retrieval_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     user: Mapped[User] = relationship(back_populates="records")
+
+
+class KnowledgeCollection(Base):
+    __tablename__ = "knowledge_collections"
+    __table_args__ = (Index("ix_knowledge_collections_source_active", "source_type", "is_active"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str] = mapped_column(String(600), nullable=False, default="")
+    source_type: Mapped[str] = mapped_column(String(40), nullable=False, default="curated")
+    tags_json: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=now_utc,
+        onupdate=now_utc,
+    )
+
+    chunks: Mapped[list["KnowledgeChunk"]] = relationship(back_populates="collection")
+    question_items: Mapped[list["QuestionBankItem"]] = relationship(back_populates="collection")
+
+
+class KnowledgeChunk(Base):
+    __tablename__ = "knowledge_chunks"
+    __table_args__ = (Index("ix_knowledge_chunks_collection_active", "collection_id", "is_active"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    collection_id: Mapped[str] = mapped_column(ForeignKey("knowledge_collections.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    source_ref: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    tags_json: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    collection: Mapped[KnowledgeCollection] = relationship(back_populates="chunks")
+
+
+class QuestionBankItem(Base):
+    __tablename__ = "question_bank_items"
+    __table_args__ = (Index("ix_question_bank_items_collection_active", "collection_id", "is_active"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    collection_id: Mapped[str] = mapped_column(ForeignKey("knowledge_collections.id"), nullable=False)
+    stem: Mapped[str] = mapped_column(String(300), nullable=False)
+    options_json: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    answer_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    explanation: Mapped[str] = mapped_column(String(600), nullable=False)
+    knowledge_point: Mapped[str] = mapped_column(String(80), nullable=False)
+    difficulty: Mapped[str] = mapped_column(String(24), nullable=False, default="normal")
+    tags_json: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=now_utc,
+        onupdate=now_utc,
+    )
+
+    collection: Mapped[KnowledgeCollection] = relationship(back_populates="question_items")
 
 
 class QuestionFeedback(Base):

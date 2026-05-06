@@ -30,6 +30,9 @@ class QuizQuestion(BaseModel):
     answerIndex: int = Field(ge=0, le=3)
     explanation: str = Field(min_length=1, max_length=600)
     knowledgePoint: str = Field(min_length=1, max_length=80)
+    sourceType: str | None = Field(default=None, max_length=40)
+    sourceIds: list[str] = Field(default_factory=list, max_length=10)
+    retrievalVersion: str | None = Field(default=None, max_length=40)
 
     @field_validator("options")
     @classmethod
@@ -52,6 +55,7 @@ class GenerateQuizResponse(BaseModel):
     questions: list[QuizQuestion] = Field(min_length=5, max_length=5)
     quizPromptVersion: str = Field(default=QUIZ_PROMPT_VERSION, max_length=40)
     quizModelName: str = Field(default="", max_length=120)
+    retrievalVersion: str | None = Field(default=None, max_length=40)
 
 
 class UserAnswer(BaseModel):
@@ -128,6 +132,7 @@ class HistorySaveRequest(BaseModel):
     quizModelName: str | None = Field(default=None, max_length=120)
     reportPromptVersion: str | None = Field(default=None, max_length=40)
     reportModelName: str | None = Field(default=None, max_length=120)
+    retrievalVersion: str | None = Field(default=None, max_length=40)
 
     @model_validator(mode="after")
     def validate_answer_references(self) -> "HistorySaveRequest":
@@ -149,6 +154,7 @@ class HistoryRecordSummary(BaseModel):
     quizModelName: str | None = None
     reportPromptVersion: str | None = None
     reportModelName: str | None = None
+    retrievalVersion: str | None = None
     completedAt: datetime
     createdAt: datetime
 

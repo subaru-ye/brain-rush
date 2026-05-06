@@ -5,9 +5,16 @@ from typing import Protocol
 from uuid import uuid4
 
 from pydantic import ValidationError
+from sqlalchemy.orm import Session
 
 from .llm import AiClientError, AiQuizDraft, AiReportDraft
 from .prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
+from .rag import (
+    RetrievedContext,
+    question_bank_item_to_quiz_question,
+    retrieve_curated_context,
+    tag_ai_question,
+)
 from .schemas import (
     GenerateQuizResponse,
     GenerateReportRequest,
@@ -20,7 +27,13 @@ from .schemas import (
 
 
 class AiClient(Protocol):
-    def generate_quiz(self, input_text: str) -> AiQuizDraft:
+    def generate_quiz(
+        self,
+        input_text: str,
+        *,
+        retrieved_context: str | None = None,
+        question_count: int = 5,
+    ) -> AiQuizDraft:
         ...
 
     def generate_report(
@@ -43,16 +56,39 @@ class AiServiceError(RuntimeError):
 @dataclass
 class LearningService:
     ai_client: AiClient
+    db: Session | None = None
 
     def generate_quiz(self, input_text: str) -> GenerateQuizResponse:
         try:
-            draft = self.ai_client.generate_quiz(input_text)
+            retrieved = retrieve_curated_context(self.db, input_text) if self.db else RetrievedContext()
+            curated_questions = self._build_curated_questions(retrieved)
+            missing_count = 5 - len(curated_questions)
+            ai_questions: list[QuizQuestion] = []
+            draft_topic = input_text.strip()
+
+            if missing_count > 0:
+                draft = self.ai_client.generate_quiz(
+                    input_text,
+                    retrieved_context=retrieved.to_prompt_context() if retrieved.has_context else None,
+                    question_count=missing_count,
+                )
+                draft_topic = draft.topic.strip()
+                if len(draft.questions) < missing_count:
+                    raise ValueError("AI returned fewer questions than requested")
+                ai_questions = self._tag_ai_questions(
+                    questions=draft.questions[:missing_count],
+                    start_index=len(curated_questions) + 1,
+                    retrieved=retrieved,
+                )
+
+            questions = curated_questions + ai_questions
             return GenerateQuizResponse(
                 sessionId=uuid4().hex,
-                topic=draft.topic.strip(),
-                questions=draft.questions,
+                topic=input_text.strip() if curated_questions else draft_topic,
+                questions=questions,
                 quizPromptVersion=getattr(self.ai_client, "quiz_prompt_version", QUIZ_PROMPT_VERSION),
                 quizModelName=getattr(self.ai_client, "model_name", ""),
+                retrievalVersion=retrieved.retrieval_version if retrieved.has_context else None,
             )
         except AiClientError as exc:
             raise AiServiceError(exc.code, exc.detail) from exc
@@ -107,6 +143,38 @@ class LearningService:
     @staticmethod
     def _is_answer_correct(question: QuizQuestion, answer: UserAnswer) -> bool:
         return answer.selectedIndex == question.answerIndex
+
+    @staticmethod
+    def _build_curated_questions(retrieved: RetrievedContext) -> list[QuizQuestion]:
+        return [
+            question_bank_item_to_quiz_question(
+                item,
+                question_id=f"q{index}",
+                retrieval_version=retrieved.retrieval_version,
+            )
+            for index, item in enumerate(retrieved.question_items[:5], start=1)
+        ]
+
+    @staticmethod
+    def _tag_ai_questions(
+        *,
+        questions: list[QuizQuestion],
+        start_index: int,
+        retrieved: RetrievedContext,
+    ) -> list[QuizQuestion]:
+        source_type = "rag_generated" if retrieved.has_context else "ai_generated"
+        source_ids = retrieved.source_ids() if retrieved.has_context else []
+        retrieval_version = retrieved.retrieval_version if retrieved.has_context else None
+        return [
+            tag_ai_question(
+                question,
+                question_id=f"q{start_index + offset}",
+                source_type=source_type,
+                source_ids=source_ids,
+                retrieval_version=retrieval_version,
+            )
+            for offset, question in enumerate(questions)
+        ]
 
     @classmethod
     def _build_wrong_question_reviews(

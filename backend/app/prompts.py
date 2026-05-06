@@ -16,6 +16,11 @@ QUIZ_USER_PROMPT = """
 Study material:
 {input_text}
 
+Retrieved context:
+{retrieved_context}
+
+Target question count: {question_count}
+
 Return exactly one JSON object and do not wrap it in Markdown.
 
 JSON schema:
@@ -35,8 +40,9 @@ JSON schema:
 
 Requirements:
 - Stay strictly within the provided study material.
-- Return exactly 5 questions.
-- ids must be q1 to q5.
+- If retrieved context is not "None", only use facts that appear in the retrieved context.
+- Return exactly {question_count} questions.
+- ids must start at q1 and increase by 1.
 - Each question must have exactly 4 options.
 - answerIndex must be between 0 and 3.
 - explanation must be short and specific.

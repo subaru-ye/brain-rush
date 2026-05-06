@@ -13,7 +13,13 @@ class ErrorAiClient:
         self.code = code
         self.detail = detail
 
-    def generate_quiz(self, input_text: str):
+    def generate_quiz(
+        self,
+        input_text: str,
+        *,
+        retrieved_context: str | None = None,
+        question_count: int = 5,
+    ):
         raise AiClientError(self.code, self.detail)
 
     def generate_report(self, topic, questions, answers, accuracy):

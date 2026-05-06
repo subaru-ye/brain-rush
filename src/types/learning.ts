@@ -5,6 +5,9 @@ export interface QuizQuestion {
   answerIndex: number
   explanation: string
   knowledgePoint: string
+  sourceType?: string
+  sourceIds?: string[]
+  retrievalVersion?: string
 }
 
 export interface GenerateQuizResponse {
@@ -13,6 +16,7 @@ export interface GenerateQuizResponse {
   questions: QuizQuestion[]
   quizPromptVersion?: string
   quizModelName?: string
+  retrievalVersion?: string
 }
 
 export interface UserAnswer {
@@ -59,6 +63,7 @@ export interface QuizSession {
   quizModelName?: string
   reportPromptVersion?: string
   reportModelName?: string
+  retrievalVersion?: string
 }
 
 export interface AuthSession {
@@ -77,6 +82,7 @@ export interface LearningRecordSummary {
   quizModelName?: string
   reportPromptVersion?: string
   reportModelName?: string
+  retrievalVersion?: string
   completedAt: string
   createdAt: string
 }

@@ -17,7 +17,13 @@ class FakeAiClient:
         self.quiz_prompt_version = "quiz-test-v1"
         self.report_prompt_version = "report-test-v1"
 
-    def generate_quiz(self, input_text: str) -> AiQuizDraft:
+    def generate_quiz(
+        self,
+        input_text: str,
+        *,
+        retrieved_context: str | None = None,
+        question_count: int = 5,
+    ) -> AiQuizDraft:
         if self.mode == "invalid_quiz":
             return AiQuizDraft(topic="坏数据", questions=[])  # type: ignore[arg-type]
         questions = [
@@ -29,7 +35,7 @@ class FakeAiClient:
                 explanation="核心是理解概念，再用题目检查掌握程度。",
                 knowledgePoint="概念理解",
             )
-            for i in range(1, 6)
+            for i in range(1, question_count + 1)
         ]
         return AiQuizDraft(topic=input_text, questions=questions)
 

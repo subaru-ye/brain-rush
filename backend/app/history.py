@@ -59,6 +59,7 @@ def save_learning_record(
     record.quiz_model_name = payload.quizModelName or model_name
     record.report_prompt_version = payload.reportPromptVersion or REPORT_PROMPT_VERSION
     record.report_model_name = payload.reportModelName or model_name
+    record.retrieval_version = payload.retrievalVersion
     record.completed_at = now_utc()
 
     db.commit()
@@ -108,6 +109,7 @@ def to_summary(record: LearningRecord) -> HistoryRecordSummary:
         quizModelName=record.quiz_model_name,
         reportPromptVersion=record.report_prompt_version,
         reportModelName=record.report_model_name,
+        retrievalVersion=record.retrieval_version,
         completedAt=ensure_datetime(record.completed_at),
         createdAt=ensure_datetime(record.created_at),
     )

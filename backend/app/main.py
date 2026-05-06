@@ -236,8 +236,9 @@ def get_ai_client() -> LangChainAiClient:
 
 def get_learning_service(
     ai_client: LangChainAiClient = Depends(get_ai_client),
+    db: Session = Depends(get_db),
 ) -> LearningService:
-    return LearningService(ai_client=ai_client)
+    return LearningService(ai_client=ai_client, db=db)
 
 
 app = create_app()

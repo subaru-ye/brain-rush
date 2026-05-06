@@ -6,9 +6,9 @@ AI 闯关学习微信小程序 MVP。
 
 - 前端：Taro + React + TypeScript 微信小程序。
 - 后端：FastAPI + LangChain + OpenAI-compatible AI 服务，默认配置指向 DeepSeek。
-- 数据：PostgreSQL 保存完成后的学习历史、题目质量反馈和错题聚合，微信静默身份用于区分用户。
+- 数据：PostgreSQL 保存完成后的学习历史、题目质量反馈、错题聚合和自维护题库/RAG 内容，微信静默身份用于区分用户。
 - MVP 闭环：首页输入 -> AI 生成题库 -> 闯关答题 -> AI 生成报告 -> 保存历史 -> 复盘展示 -> 错题本复训。
-- 暂不包含：支付、排行榜、RAG、文件/视频/网页解析。
+- 暂不包含：支付、排行榜、用户上传文件/视频/网页解析。
 
 ## 后端本地运行
 
@@ -43,6 +43,15 @@ AUTH_TOKEN_SECRET=change-me-in-production
 
 ```powershell
 .\backend\scripts\stamp-db.ps1
+```
+
+第一版 RAG 采用自维护题库优先：`knowledge_collections` 保存知识集合，
+`knowledge_chunks` 保存可检索知识片段，`question_bank_items` 保存高质量原题。
+生成题目时后端会先检索这些内容；命中足够原题时不调用 AI，不足时只让 AI 基于检索上下文补齐。
+可用 JSON 文件导入自维护内容：
+
+```powershell
+.\backend\scripts\import-curated-rag.ps1 -Path .\data\curated-rag.json
 ```
 
 填好 `backend\.env` 后启动：

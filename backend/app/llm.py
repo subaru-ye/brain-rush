@@ -28,7 +28,7 @@ from .schemas import QuizQuestion, UserAnswer
 
 class AiQuizDraft(BaseModel):
     topic: str = Field(min_length=1, max_length=120)
-    questions: list[QuizQuestion] = Field(min_length=5, max_length=5)
+    questions: list[QuizQuestion] = Field(min_length=1, max_length=5)
 
 
 class AiReportDraft(BaseModel):
@@ -86,12 +86,22 @@ class LangChainAiClient:
             max_retries=self.max_retries,
         )
 
-    def generate_quiz(self, input_text: str) -> AiQuizDraft:
+    def generate_quiz(
+        self,
+        input_text: str,
+        *,
+        retrieved_context: str | None = None,
+        question_count: int = 5,
+    ) -> AiQuizDraft:
         return self._invoke_structured_prompt(
             operation="generate_quiz",
             prompt_version=self.quiz_prompt_version,
             prompt=build_quiz_prompt(),
-            payload={"input_text": input_text},
+            payload={
+                "input_text": input_text,
+                "retrieved_context": retrieved_context or "None",
+                "question_count": question_count,
+            },
             model=AiQuizDraft,
             invalid_response_detail="AI 返回的题目结构不合法，请稍后重试",
         )

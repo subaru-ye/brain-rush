@@ -13,15 +13,14 @@ def test_alembic_current_schema_revision_is_registered():
     config = Config(str(BACKEND_ROOT / "alembic.ini"))
     script = ScriptDirectory.from_config(config)
 
-    assert script.get_heads() == ["0001_current_schema"]
+    assert script.get_heads() == ["0002_curated_rag"]
 
 
 def test_alembic_current_schema_revision_mentions_tracked_tables():
-    revision_file = BACKEND_ROOT / "alembic" / "versions" / "0001_current_schema.py"
+    revision_file = BACKEND_ROOT / "alembic" / "versions" / "0002_curated_rag.py"
     revision_source = revision_file.read_text(encoding="utf-8")
 
-    assert '"users"' in revision_source
-    assert '"learning_records"' in revision_source
-    assert '"question_feedback"' in revision_source
-    assert '"quiz_prompt_version"' in revision_source
-    assert '"report_model_name"' in revision_source
+    assert '"knowledge_collections"' in revision_source
+    assert '"knowledge_chunks"' in revision_source
+    assert '"question_bank_items"' in revision_source
+    assert '"retrieval_version"' in revision_source

@@ -173,7 +173,8 @@ export function createHistoryRecord(
     quizPromptVersion: session.quizPromptVersion,
     quizModelName: session.quizModelName,
     reportPromptVersion: session.reportPromptVersion,
-    reportModelName: session.reportModelName
+    reportModelName: session.reportModelName,
+    retrievalVersion: session.retrievalVersion
   }, { token })
 }
 
