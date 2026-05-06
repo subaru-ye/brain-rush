@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from .llm import AiClientError, AiQuizDraft, AiReportDraft
 from .prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
+from .quiz_answers import format_option_indexes, is_answer_correct
 from .rag import (
     RetrievedContext,
     question_bank_item_to_quiz_question,
@@ -142,7 +143,7 @@ class LearningService:
 
     @staticmethod
     def _is_answer_correct(question: QuizQuestion, answer: UserAnswer) -> bool:
-        return answer.selectedIndex == question.answerIndex
+        return is_answer_correct(question, answer)
 
     @staticmethod
     def _build_curated_questions(retrieved: RetrievedContext) -> list[QuizQuestion]:
@@ -189,8 +190,8 @@ class LearningService:
             answer = answer_by_question.get(question.id)
             if not answer or cls._is_answer_correct(question_by_id[question.id], answer):
                 continue
-            selected = question.options[answer.selectedIndex]
-            correct = question.options[question.answerIndex]
+            selected = format_option_indexes(question.options, answer.selectedIndexes)
+            correct = format_option_indexes(question.options, question.answerIndexes)
             wrong_reviews.append(
                 WrongQuestionReview(
                     questionId=question.id,

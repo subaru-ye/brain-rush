@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import KnowledgeChunk, QuestionBankItem
+from .quiz_answers import format_option_indexes
 from .schemas import QuizQuestion
 
 
@@ -35,7 +36,7 @@ class RetrievedContext:
                 "\n".join(
                     [
                         f"Question: {item.stem}",
-                        f"Answer: {item.options_json[item.answer_index]}",
+                        f"Answer: {format_option_indexes(_options(item), _answer_indexes(item))}",
                         f"Explanation: {item.explanation}",
                         f"Knowledge point: {item.knowledge_point}",
                     ]
@@ -94,8 +95,10 @@ def question_bank_item_to_quiz_question(
     return QuizQuestion(
         id=question_id,
         stem=item.stem,
-        options=item.options_json,
-        answerIndex=item.answer_index,
+        options=_options(item),
+        answerIndex=_answer_indexes(item)[0],
+        answerIndexes=_answer_indexes(item),
+        questionType=item.question_type,
         explanation=item.explanation,
         knowledgePoint=item.knowledge_point,
         sourceType="curated_question",
@@ -120,6 +123,15 @@ def tag_ai_question(
             "retrievalVersion": retrieval_version,
         }
     )
+
+
+def _answer_indexes(item: QuestionBankItem) -> list[int]:
+    indexes = item.answer_indexes_json or [item.answer_index]
+    return sorted(dict.fromkeys(indexes))
+
+
+def _options(item: QuestionBankItem) -> list[str]:
+    return [str(option) for option in item.options_json]
 
 
 def _search_terms(query: str) -> list[str]:

@@ -86,7 +86,9 @@ def upsert_questions(
                 "id": "q1",
                 "stem": payload["stem"],
                 "options": payload["options"],
-                "answerIndex": payload["answerIndex"],
+                "answerIndex": payload.get("answerIndex"),
+                "answerIndexes": payload.get("answerIndexes", []),
+                "questionType": payload.get("questionType"),
                 "explanation": payload["explanation"],
                 "knowledgePoint": payload["knowledgePoint"],
             }
@@ -102,6 +104,8 @@ def upsert_questions(
             db.add(question)
         question.options_json = quiz_question.options
         question.answer_index = quiz_question.answerIndex
+        question.answer_indexes_json = quiz_question.answerIndexes
+        question.question_type = quiz_question.questionType or "single_choice"
         question.explanation = quiz_question.explanation
         question.knowledge_point = quiz_question.knowledgePoint
         question.difficulty = str(payload.get("difficulty", "normal")).strip() or "normal"

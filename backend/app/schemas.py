@@ -9,6 +9,7 @@ from .prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
 
 
 TextInput = Annotated[str, Field(min_length=2, max_length=4000)]
+QuestionType = Literal["single_choice", "multiple_choice", "true_false"]
 
 
 class GenerateQuizRequest(BaseModel):
@@ -26,13 +27,34 @@ class GenerateQuizRequest(BaseModel):
 class QuizQuestion(BaseModel):
     id: str = Field(min_length=1)
     stem: str = Field(min_length=1, max_length=300)
-    options: list[str] = Field(min_length=3, max_length=4)
+    options: list[str] = Field(min_length=2, max_length=4)
     answerIndex: int = Field(ge=0, le=3)
+    answerIndexes: list[int] = Field(default_factory=list, max_length=4)
+    questionType: QuestionType | None = None
     explanation: str = Field(min_length=1, max_length=600)
     knowledgePoint: str = Field(min_length=1, max_length=80)
     sourceType: str | None = Field(default=None, max_length=40)
     sourceIds: list[str] = Field(default_factory=list, max_length=10)
     retrievalVersion: str | None = Field(default=None, max_length=40)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_answer_fields(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        next_data = dict(data)
+        answer_indexes = next_data.get("answerIndexes")
+        answer_index = next_data.get("answerIndex")
+        if not answer_indexes and answer_index is not None:
+            answer_indexes = [answer_index]
+            next_data["answerIndexes"] = answer_indexes
+        if answer_index is None and isinstance(answer_indexes, list) and answer_indexes:
+            next_data["answerIndex"] = answer_indexes[0]
+        if not next_data.get("questionType") and isinstance(answer_indexes, list):
+            next_data["questionType"] = (
+                "multiple_choice" if len(answer_indexes) > 1 else "single_choice"
+            )
+        return next_data
 
     @field_validator("options")
     @classmethod
@@ -49,6 +71,30 @@ class QuizQuestion(BaseModel):
         return self
 
 
+    @model_validator(mode="after")
+    def validate_question_type_answers(self) -> "QuizQuestion":
+        answer_indexes = sorted(dict.fromkeys(self.answerIndexes))
+        if not answer_indexes:
+            answer_indexes = [self.answerIndex]
+        if any(index < 0 or index >= len(self.options) for index in answer_indexes):
+            raise ValueError("answerIndexes must point to existing options")
+
+        question_type = self.questionType or (
+            "multiple_choice" if len(answer_indexes) > 1 else "single_choice"
+        )
+        if question_type == "multiple_choice" and len(answer_indexes) < 2:
+            raise ValueError("multiple_choice requires at least two correct answers")
+        if question_type in {"single_choice", "true_false"} and len(answer_indexes) != 1:
+            raise ValueError("single_choice and true_false require one correct answer")
+        if question_type == "true_false" and len(self.options) != 2:
+            raise ValueError("true_false requires exactly two options")
+
+        self.questionType = question_type
+        self.answerIndexes = answer_indexes
+        self.answerIndex = answer_indexes[0]
+        return self
+
+
 class GenerateQuizResponse(BaseModel):
     sessionId: str
     topic: str
@@ -61,8 +107,35 @@ class GenerateQuizResponse(BaseModel):
 class UserAnswer(BaseModel):
     questionId: str = Field(min_length=1)
     selectedIndex: int = Field(ge=0, le=3)
+    selectedIndexes: list[int] = Field(default_factory=list, max_length=4)
     isCorrect: bool
     elapsedMs: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_selected_fields(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        next_data = dict(data)
+        selected_indexes = next_data.get("selectedIndexes")
+        selected_index = next_data.get("selectedIndex")
+        if not selected_indexes and selected_index is not None:
+            selected_indexes = [selected_index]
+            next_data["selectedIndexes"] = selected_indexes
+        if selected_index is None and isinstance(selected_indexes, list) and selected_indexes:
+            next_data["selectedIndex"] = selected_indexes[0]
+        return next_data
+
+    @model_validator(mode="after")
+    def validate_selected_indexes(self) -> "UserAnswer":
+        selected_indexes = sorted(dict.fromkeys(self.selectedIndexes))
+        if not selected_indexes:
+            selected_indexes = [self.selectedIndex]
+        if any(index < 0 or index > 3 for index in selected_indexes):
+            raise ValueError("selectedIndexes must be between 0 and 3")
+        self.selectedIndexes = selected_indexes
+        self.selectedIndex = selected_indexes[0]
+        return self
 
 
 class GenerateReportRequest(BaseModel):
@@ -184,6 +257,7 @@ class QuestionFeedbackRequest(BaseModel):
     reason: QuestionFeedbackReason
     questionSnapshot: QuizQuestion
     selectedIndex: int | None = Field(default=None, ge=0, le=3)
+    selectedIndexes: list[int] = Field(default_factory=list, max_length=4)
     sourcePage: QuestionFeedbackSource
 
 
@@ -198,10 +272,13 @@ class WrongQuestionItem(BaseModel):
     sessionId: str
     topic: str
     questionId: str
+    questionType: QuestionType | None = None
     stem: str
     options: list[str]
-    answerIndex: int
-    selectedIndex: int
+    answerIndex: int | None = None
+    answerIndexes: list[int] = Field(default_factory=list)
+    selectedIndex: int | None = None
+    selectedIndexes: list[int] = Field(default_factory=list)
     explanation: str
     knowledgePoint: str
     userAnswer: str

@@ -216,6 +216,47 @@ def test_generate_report_recomputes_score_when_frontend_is_correct_is_wrong(clie
     assert [item["questionId"] for item in report["wrongQuestions"]] == ["q1", "q5"]
 
 
+def test_generate_report_supports_multiple_choice_answers(client):
+    quiz = {
+        "topic": "AI Agent",
+        "questions": [
+            {
+                "id": "q1",
+                "stem": "Which items are Agent abilities?",
+                "questionType": "multiple_choice",
+                "options": ["Plan", "Use tools", "Only store data", "Only render UI"],
+                "answerIndexes": [0, 1],
+                "explanation": "Agents can plan and use tools.",
+                "knowledgePoint": "Agent abilities",
+            },
+            {
+                "id": "q2",
+                "stem": "Agent can use tools.",
+                "questionType": "true_false",
+                "options": ["True", "False"],
+                "answerIndexes": [0],
+                "explanation": "Tool use is a common Agent ability.",
+                "knowledgePoint": "Agent abilities",
+            },
+        ],
+    }
+    answers = [
+        {"questionId": "q1", "selectedIndexes": [0, 1], "isCorrect": False},
+        {"questionId": "q2", "selectedIndexes": [1], "isCorrect": True},
+    ]
+
+    response = client.post(
+        "/api/generate-report",
+        json={"topic": quiz["topic"], "questions": quiz["questions"], "answers": answers},
+    )
+
+    assert response.status_code == 200
+    report = response.json()["report"]
+    assert report["accuracy"] == 50
+    assert report["wrongQuestions"][0]["questionId"] == "q2"
+    assert report["wrongQuestions"][0]["correctAnswer"] == "A，True"
+
+
 def test_generate_report_uses_recomputed_answer_for_wrong_question_review(client):
     quiz_response = client.post("/api/generate-quiz", json={"inputText": "AI Agent"})
     quiz = quiz_response.json()
@@ -229,8 +270,8 @@ def test_generate_report_uses_recomputed_answer_for_wrong_question_review(client
     assert response.status_code == 200
     wrong_question = response.json()["report"]["wrongQuestions"][0]
     assert wrong_question["questionId"] == "q1"
-    assert wrong_question["userAnswer"] == quiz["questions"][0]["options"][1]
-    assert wrong_question["correctAnswer"] == quiz["questions"][0]["options"][0]
+    assert wrong_question["userAnswer"] == f"B，{quiz['questions'][0]['options'][1]}"
+    assert wrong_question["correctAnswer"] == f"A，{quiz['questions'][0]['options'][0]}"
 
 
 def test_generate_report_rejects_unknown_question_id(client):

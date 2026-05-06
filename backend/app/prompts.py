@@ -3,12 +3,12 @@ from __future__ import annotations
 from langchain_core.prompts import ChatPromptTemplate
 
 
-QUIZ_PROMPT_VERSION = "quiz-v1"
+QUIZ_PROMPT_VERSION = "quiz-v2"
 REPORT_PROMPT_VERSION = "report-v1"
 
 QUIZ_SYSTEM_PROMPT = (
     "You are a Chinese learning coach for a mobile quiz app. "
-    "Turn the user's study material into concise, accurate single-choice questions. "
+    "Turn the user's study material into concise, accurate quiz questions. "
     "Keep every user-facing field in Simplified Chinese except question ids."
 )
 
@@ -30,8 +30,9 @@ JSON schema:
     {{
       "id": "q1",
       "stem": "题干",
+      "questionType": "single_choice",
       "options": ["选项A", "选项B", "选项C", "选项D"],
-      "answerIndex": 0,
+      "answerIndexes": [0],
       "explanation": "答案讲解",
       "knowledgePoint": "知识点"
     }}
@@ -43,8 +44,12 @@ Requirements:
 - If retrieved context is not "None", only use facts that appear in the retrieved context.
 - Return exactly {question_count} questions.
 - ids must start at q1 and increase by 1.
-- Each question must have exactly 4 options.
-- answerIndex must be between 0 and 3.
+- Mix question types when question_count is 5: 3 single_choice, 1 multiple_choice, and 1 true_false.
+- questionType must be one of single_choice, multiple_choice, true_false.
+- single_choice must have exactly 4 options and exactly one answerIndexes item.
+- multiple_choice must have exactly 4 options and 2 or 3 answerIndexes items.
+- true_false must have exactly 2 options and exactly one answerIndexes item.
+- answerIndexes values must point to existing options.
 - explanation must be short and specific.
 """.strip()
 

@@ -4,6 +4,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import LearningRecord, QuestionFeedback, now_utc
+from .quiz_answers import (
+    format_option_indexes,
+    get_answer_indexes,
+    get_selected_indexes,
+    is_answer_correct,
+    normalize_question_dump,
+)
 from .schemas import (
     QuestionFeedbackRequest,
     QuestionFeedbackResponse,
@@ -35,8 +42,11 @@ def save_question_feedback(
         db.add(feedback)
 
     feedback.topic = payload.topic
-    feedback.question_json = payload.questionSnapshot.model_dump()
+    feedback.question_json = normalize_question_dump(payload.questionSnapshot)
     feedback.selected_index = payload.selectedIndex
+    feedback.selected_indexes_json = payload.selectedIndexes or (
+        [payload.selectedIndex] if payload.selectedIndex is not None else []
+    )
     feedback.source_page = payload.sourcePage
     feedback.updated_at = now_utc()
 
@@ -70,15 +80,15 @@ def list_wrong_questions(
             if not question:
                 continue
 
-            selected_index = answer.get("selectedIndex")
-            answer_index = question.get("answerIndex")
+            selected_indexes = get_selected_indexes(answer)
+            answer_indexes = get_answer_indexes(question)
             options = question.get("options") or []
             if (
-                not isinstance(selected_index, int)
-                or not isinstance(answer_index, int)
-                or selected_index == answer_index
-                or selected_index >= len(options)
-                or answer_index >= len(options)
+                not selected_indexes
+                or not answer_indexes
+                or is_answer_correct(question, answer)
+                or any(index >= len(options) for index in selected_indexes)
+                or any(index >= len(options) for index in answer_indexes)
             ):
                 continue
 
@@ -88,14 +98,17 @@ def list_wrong_questions(
                     sessionId=record.session_id,
                     topic=record.topic,
                     questionId=str(question.get("id", "")),
+                    questionType=question.get("questionType"),
                     stem=str(question.get("stem", "")),
                     options=[str(option) for option in options],
-                    answerIndex=answer_index,
-                    selectedIndex=selected_index,
+                    answerIndex=answer_indexes[0],
+                    answerIndexes=answer_indexes,
+                    selectedIndex=selected_indexes[0],
+                    selectedIndexes=selected_indexes,
                     explanation=str(question.get("explanation", "")),
                     knowledgePoint=str(question.get("knowledgePoint", "")),
-                    userAnswer=str(options[selected_index]),
-                    correctAnswer=str(options[answer_index]),
+                    userAnswer=format_option_indexes(options, selected_indexes),
+                    correctAnswer=format_option_indexes(options, answer_indexes),
                     completedAt=record.completed_at,
                 )
             )

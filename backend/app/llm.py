@@ -23,6 +23,7 @@ from .prompts import (
     build_quiz_prompt,
     build_report_prompt,
 )
+from .quiz_answers import format_option_indexes, is_answer_correct
 from .schemas import QuizQuestion, UserAnswer
 
 
@@ -117,12 +118,15 @@ class LangChainAiClient:
         answer_by_question = {answer.questionId: answer for answer in answers}
         for question in questions:
             answer = answer_by_question.get(question.id)
-            if answer and not answer.isCorrect:
+            if answer and not is_answer_correct(question, answer):
                 wrong_points.append(
                     {
                         "stem": question.stem,
                         "knowledgePoint": question.knowledgePoint,
-                        "correctAnswer": question.options[question.answerIndex],
+                        "correctAnswer": format_option_indexes(
+                            question.options,
+                            question.answerIndexes,
+                        ),
                         "explanation": question.explanation,
                     }
                 )

@@ -117,6 +117,8 @@ class QuestionBankItem(Base):
     stem: Mapped[str] = mapped_column(String(300), nullable=False)
     options_json: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     answer_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    answer_indexes_json: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
+    question_type: Mapped[str] = mapped_column(String(32), nullable=False, default="single_choice")
     explanation: Mapped[str] = mapped_column(String(600), nullable=False)
     knowledge_point: Mapped[str] = mapped_column(String(80), nullable=False)
     difficulty: Mapped[str] = mapped_column(String(24), nullable=False, default="normal")
@@ -153,6 +155,7 @@ class QuestionFeedback(Base):
     reason: Mapped[str] = mapped_column(String(40), nullable=False)
     question_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     selected_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    selected_indexes_json: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
     source_page: Mapped[str] = mapped_column(String(24), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(

@@ -114,6 +114,7 @@ def test_generate_quiz_returns_curated_questions_without_ai_call():
     assert response.retrievalVersion == "curated-rag-v1"
     assert {question.sourceType for question in response.questions} == {"curated_question"}
     assert response.questions[0].id == "q1"
+    assert response.questions[0].answerIndexes == [0]
 
 
 def test_generate_quiz_uses_ai_only_for_missing_questions():
@@ -189,3 +190,32 @@ def test_import_curated_payload_upserts_questions_and_chunks():
     assert db.query(KnowledgeCollection).count() == 1
     assert db.query(KnowledgeChunk).count() == 1
     assert db.query(QuestionBankItem).count() == 1
+
+
+def test_import_curated_payload_supports_multiple_choice_format():
+    db = build_db()
+
+    import_curated_payload(
+        db,
+        {
+            "collections": [
+                {
+                    "title": "RAG 入门",
+                    "questions": [
+                        {
+                            "stem": "RAG 包含哪些关键步骤？",
+                            "questionType": "multiple_choice",
+                            "options": ["检索", "生成", "完全跳过上下文", "只做 UI"],
+                            "answerIndexes": [0, 1],
+                            "explanation": "RAG 的关键链路包含检索和生成。",
+                            "knowledgePoint": "RAG 流程",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+
+    item = db.query(QuestionBankItem).one()
+    assert item.question_type == "multiple_choice"
+    assert item.answer_indexes_json == [0, 1]

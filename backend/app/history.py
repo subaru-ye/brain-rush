@@ -9,6 +9,7 @@ from .config import get_settings
 from .errors import ApiHttpError
 from .models import LearningRecord, User, now_utc
 from .prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
+from .quiz_answers import is_answer_correct, normalize_answer_dump, normalize_question_dump
 from .schemas import (
     HistoryRecordDetail,
     HistoryRecordSummary,
@@ -49,8 +50,8 @@ def save_learning_record(
 
     model_name = get_settings().openai_model
     record.topic = payload.topic
-    record.questions_json = [question.model_dump() for question in payload.questions]
-    record.answers_json = [answer.model_dump() for answer in payload.answers]
+    record.questions_json = [normalize_question_dump(question) for question in payload.questions]
+    record.answers_json = [normalize_answer_dump(answer) for answer in payload.answers]
     record.report_json = payload.report.model_dump()
     record.score = score
     record.total = total
@@ -91,7 +92,7 @@ def calculate_score(payload: HistorySaveRequest) -> tuple[int, int, int]:
         1
         for answer in payload.answers
         if answer.questionId in question_by_id
-        and answer.selectedIndex == question_by_id[answer.questionId].answerIndex
+        and is_answer_correct(question_by_id[answer.questionId], answer)
     )
     accuracy = round(correct_count / total * 100) if total else 0
     return accuracy, total, accuracy
