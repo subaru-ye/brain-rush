@@ -36,7 +36,7 @@ def save_learning_record(
     user_id: str,
     payload: HistorySaveRequest,
 ) -> LearningRecord:
-    score, total, accuracy = calculate_score(payload)
+    total, accuracy = calculate_score(payload)
     record = db.scalar(
         select(LearningRecord).where(
             LearningRecord.user_id == user_id,
@@ -53,7 +53,6 @@ def save_learning_record(
     record.questions_json = [normalize_question_dump(question) for question in payload.questions]
     record.answers_json = [normalize_answer_dump(answer) for answer in payload.answers]
     record.report_json = payload.report.model_dump()
-    record.score = score
     record.total = total
     record.accuracy_percent = accuracy
     record.quiz_prompt_version = payload.quizPromptVersion or QUIZ_PROMPT_VERSION
@@ -85,7 +84,7 @@ def get_learning_record(db: Session, user_id: str, record_id: str) -> HistoryRec
     return to_detail(record)
 
 
-def calculate_score(payload: HistorySaveRequest) -> tuple[int, int, int]:
+def calculate_score(payload: HistorySaveRequest) -> tuple[int, int]:
     question_by_id = {question.id: question for question in payload.questions}
     total = len(payload.questions)
     correct_count = sum(
@@ -95,7 +94,7 @@ def calculate_score(payload: HistorySaveRequest) -> tuple[int, int, int]:
         and is_answer_correct(question_by_id[answer.questionId], answer)
     )
     accuracy = round(correct_count / total * 100) if total else 0
-    return accuracy, total, accuracy
+    return total, accuracy
 
 
 def to_summary(record: LearningRecord) -> HistoryRecordSummary:
@@ -103,7 +102,7 @@ def to_summary(record: LearningRecord) -> HistoryRecordSummary:
         id=record.id,
         sessionId=record.session_id,
         topic=record.topic,
-        score=record.score,
+        score=record.accuracy_percent,
         total=record.total,
         accuracy=record.accuracy_percent,
         quizPromptVersion=record.quiz_prompt_version,

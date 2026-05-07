@@ -41,7 +41,7 @@ def upgrade() -> None:
     if not _table_exists("knowledge_collections"):
         op.create_table(
             "knowledge_collections",
-            sa.Column("id", sa.String(length=32), nullable=False),
+            sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
             sa.Column("title", sa.String(length=120), nullable=False),
             sa.Column("description", sa.String(length=600), nullable=False),
             sa.Column("source_type", sa.String(length=40), nullable=False),
@@ -60,8 +60,8 @@ def upgrade() -> None:
     if not _table_exists("knowledge_chunks"):
         op.create_table(
             "knowledge_chunks",
-            sa.Column("id", sa.String(length=32), nullable=False),
-            sa.Column("collection_id", sa.String(length=32), nullable=False),
+            sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
+            sa.Column("collection_id", sa.Uuid(as_uuid=False), nullable=False),
             sa.Column("title", sa.String(length=160), nullable=False),
             sa.Column("content", sa.Text(), nullable=False),
             sa.Column("source_ref", sa.String(length=200), nullable=False),
@@ -80,8 +80,8 @@ def upgrade() -> None:
     if not _table_exists("question_bank_items"):
         op.create_table(
             "question_bank_items",
-            sa.Column("id", sa.String(length=32), nullable=False),
-            sa.Column("collection_id", sa.String(length=32), nullable=False),
+            sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
+            sa.Column("collection_id", sa.Uuid(as_uuid=False), nullable=False),
             sa.Column("stem", sa.String(length=300), nullable=False),
             sa.Column("options_json", sa.JSON(), nullable=False),
             sa.Column("answer_index", sa.Integer(), nullable=False),

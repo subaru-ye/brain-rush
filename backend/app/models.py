@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -21,7 +21,7 @@ def new_id() -> str:
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=new_id)
     openid: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
     unionid: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
@@ -42,14 +42,13 @@ class LearningRecord(Base):
         Index("ix_learning_records_user_completed", "user_id", "completed_at"),
     )
 
-    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(Uuid(as_uuid=False), ForeignKey("users.id"), nullable=False)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False)
     topic: Mapped[str] = mapped_column(String(120), nullable=False)
     questions_json: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
     answers_json: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
     report_json: Mapped[dict] = mapped_column(JSON, nullable=False)
-    score: Mapped[int] = mapped_column(Integer, nullable=False)
     total: Mapped[int] = mapped_column(Integer, nullable=False)
     accuracy_percent: Mapped[int] = mapped_column(Integer, nullable=False)
     quiz_prompt_version: Mapped[str] = mapped_column(
@@ -75,7 +74,7 @@ class KnowledgeCollection(Base):
     __tablename__ = "knowledge_collections"
     __table_args__ = (Index("ix_knowledge_collections_source_active", "source_type", "is_active"),)
 
-    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=new_id)
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str] = mapped_column(String(600), nullable=False, default="")
     source_type: Mapped[str] = mapped_column(String(40), nullable=False, default="curated")
@@ -96,8 +95,12 @@ class KnowledgeChunk(Base):
     __tablename__ = "knowledge_chunks"
     __table_args__ = (Index("ix_knowledge_chunks_collection_active", "collection_id", "is_active"),)
 
-    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
-    collection_id: Mapped[str] = mapped_column(ForeignKey("knowledge_collections.id"), nullable=False)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=new_id)
+    collection_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("knowledge_collections.id"),
+        nullable=False,
+    )
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     source_ref: Mapped[str] = mapped_column(String(200), nullable=False, default="")
@@ -112,8 +115,12 @@ class QuestionBankItem(Base):
     __tablename__ = "question_bank_items"
     __table_args__ = (Index("ix_question_bank_items_collection_active", "collection_id", "is_active"),)
 
-    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
-    collection_id: Mapped[str] = mapped_column(ForeignKey("knowledge_collections.id"), nullable=False)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=new_id)
+    collection_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("knowledge_collections.id"),
+        nullable=False,
+    )
     stem: Mapped[str] = mapped_column(String(300), nullable=False)
     options_json: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     answer_index: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -147,8 +154,8 @@ class QuestionFeedback(Base):
         Index("ix_question_feedback_user_created", "user_id", "created_at"),
     )
 
-    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(Uuid(as_uuid=False), ForeignKey("users.id"), nullable=False)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False)
     topic: Mapped[str] = mapped_column(String(120), nullable=False)
     question_id: Mapped[str] = mapped_column(String(128), nullable=False)

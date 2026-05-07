@@ -71,7 +71,7 @@ def upgrade() -> None:
     if not _table_exists("users"):
         op.create_table(
             "users",
-            sa.Column("id", sa.String(length=32), nullable=False),
+            sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
             sa.Column("openid", sa.String(length=128), nullable=False),
             sa.Column("unionid", sa.String(length=128), nullable=True),
             sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -83,14 +83,13 @@ def upgrade() -> None:
     if not _table_exists("learning_records"):
         op.create_table(
             "learning_records",
-            sa.Column("id", sa.String(length=32), nullable=False),
-            sa.Column("user_id", sa.String(length=32), nullable=False),
+            sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
+            sa.Column("user_id", sa.Uuid(as_uuid=False), nullable=False),
             sa.Column("session_id", sa.String(length=64), nullable=False),
             sa.Column("topic", sa.String(length=120), nullable=False),
             sa.Column("questions_json", sa.JSON(), nullable=False),
             sa.Column("answers_json", sa.JSON(), nullable=False),
             sa.Column("report_json", sa.JSON(), nullable=False),
-            sa.Column("score", sa.Integer(), nullable=False),
             sa.Column("total", sa.Integer(), nullable=False),
             sa.Column("accuracy_percent", sa.Integer(), nullable=False),
             sa.Column(
@@ -171,8 +170,8 @@ def upgrade() -> None:
     if not _table_exists("question_feedback"):
         op.create_table(
             "question_feedback",
-            sa.Column("id", sa.String(length=32), nullable=False),
-            sa.Column("user_id", sa.String(length=32), nullable=False),
+            sa.Column("id", sa.Uuid(as_uuid=False), nullable=False),
+            sa.Column("user_id", sa.Uuid(as_uuid=False), nullable=False),
             sa.Column("session_id", sa.String(length=64), nullable=False),
             sa.Column("topic", sa.String(length=120), nullable=False),
             sa.Column("question_id", sa.String(length=128), nullable=False),
