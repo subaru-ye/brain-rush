@@ -26,6 +26,10 @@ OPENAI_BASE_URL=https://api.deepseek.com
 OPENAI_MODEL=deepseek-v4-flash
 OPENAI_TIMEOUT_SECONDS=60
 OPENAI_MAX_RETRIES=2
+EMBEDDING_API_KEY=你的百炼或 OpenAI-compatible Embedding API Key
+EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+EMBEDDING_MODEL=text-embedding-v4
+EMBEDDING_DIMENSIONS=1536
 GENERATION_RATE_LIMIT_MAX_REQUESTS=10
 GENERATION_RATE_LIMIT_WINDOW_SECONDS=3600
 DATABASE_URL=postgresql+psycopg://brain_rush:brain_rush@localhost:5432/brain_rush
@@ -45,13 +49,22 @@ AUTH_TOKEN_SECRET=change-me-in-production
 .\backend\scripts\stamp-db.ps1
 ```
 
-第一版 RAG 采用自维护题库优先：`knowledge_collections` 保存知识集合，
-`knowledge_chunks` 保存可检索知识片段，`question_bank_items` 保存高质量原题。
-生成题目时后端会先检索这些内容；命中足够原题时不调用 AI，不足时只让 AI 基于检索上下文补齐。
+当前 RAG 采用 `pgvector` 混合检索：`knowledge_collections` 保存知识领域，
+`knowledge_chunks` 保存可检索知识片段和向量，`question_bank_items` 保存高质量原题和向量。
+导入知识库时会调用 Embedding 模型生成向量；生成题目时会对用户输入生成 query embedding，
+再结合关键词检索与向量检索召回相关内容。命中足够原题时不调用出题 AI，不足时只让 AI 基于检索上下文补齐。
+
+知识库建模时先判断 `collection`，再判断 `tags`，最后写 `chunks/questions`：
+
+- `collection` 是知识领域，不是资料批次。例如同一批或多批 RAG 资料都应归入 `RAG 知识库`。
+- `tags` 表示子主题，例如基础概念、检索优化、Rerank、评估、pgvector。
+- `chunks` 保存具体知识片段，`questions` 保存精选题目。
+- 不要因为用户分多次提供资料，就为每批资料新建一个 collection。
+
 可用 JSON 文件导入自维护内容：
 
 ```powershell
-.\backend\scripts\import-curated-rag.ps1 -Path .\data\curated-rag.json
+.\backend\scripts\import-curated-rag.ps1 -Path .\backend\data\rag-knowledge.json
 ```
 
 填好 `backend\.env` 后启动：
