@@ -14,6 +14,7 @@ from .rag import (
     RetrievedContext,
     question_bank_item_to_quiz_question,
     retrieve_curated_context,
+    retrieve_curated_context_with_client,
     tag_ai_question,
 )
 from .schemas import (
@@ -58,10 +59,21 @@ class AiServiceError(RuntimeError):
 class LearningService:
     ai_client: AiClient
     db: Session | None = None
+    embedding_client: object | None = None
 
     def generate_quiz(self, input_text: str) -> GenerateQuizResponse:
         try:
-            retrieved = retrieve_curated_context(self.db, input_text) if self.db else RetrievedContext()
+            retrieved = (
+                retrieve_curated_context_with_client(
+                    self.db,
+                    input_text,
+                    embedding_client=self.embedding_client,
+                )
+                if self.db and self.embedding_client
+                else retrieve_curated_context(self.db, input_text)
+                if self.db
+                else RetrievedContext()
+            )
             curated_questions = self._build_curated_questions(retrieved)
             missing_count = 5 - len(curated_questions)
             ai_questions: list[QuizQuestion] = []

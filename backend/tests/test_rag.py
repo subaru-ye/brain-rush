@@ -1,14 +1,15 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import models  # noqa: F401
-from app.curated_import import import_curated_payload
+from app.curated_import import import_curated_payload, import_curated_payload_with_stats
 from app.database import Base
 from app.llm import AiQuizDraft
 from app.models import KnowledgeChunk, KnowledgeCollection, QuestionBankItem
+from app.rag import retrieve_curated_context_with_client
 from app.schemas import QuizQuestion
 from app.services import LearningService
 
@@ -54,6 +55,29 @@ class CountingAiClient:
         raise AssertionError("not needed")
 
 
+class FakeEmbeddingClient:
+    is_enabled = True
+    model_name = "fake-embedding"
+    version = "embedding-test-v1"
+
+    def __init__(self, query_vector: list[float] | None = None):
+        self.query_vector = query_vector or make_vector(0)
+        self.embed_calls: list[list[str]] = []
+
+    def embed_query(self, text: str) -> list[float]:
+        return self.query_vector
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        self.embed_calls.append(texts)
+        return [make_vector(index) for index, _ in enumerate(texts)]
+
+
+def make_vector(index: int) -> list[float]:
+    values = [0.0] * 1536
+    values[index] = 1.0
+    return values
+
+
 def build_db():
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -66,8 +90,8 @@ def build_db():
 
 def add_collection(db, *, question_count: int, with_chunk: bool = True):
     collection = KnowledgeCollection(
-        title="AI Agent 入门",
-        description="AI Agent 定义、能力和工具调用",
+        title="AI Agent intro",
+        description="AI Agent definition, capabilities, and tool use",
         source_type="curated",
         tags_json=["AI Agent", "RAG"],
     )
@@ -78,8 +102,8 @@ def add_collection(db, *, question_count: int, with_chunk: bool = True):
         db.add(
             KnowledgeChunk(
                 collection_id=collection.id,
-                title="AI Agent 定义",
-                content="AI Agent 是能够感知环境、规划任务并调用工具完成目标的软件实体。",
+                title="AI Agent definition",
+                content="AI Agent can perceive context, plan tasks, and call tools to complete goals.",
                 source_ref="manual",
                 tags_json=["AI Agent"],
             )
@@ -89,11 +113,11 @@ def add_collection(db, *, question_count: int, with_chunk: bool = True):
         db.add(
             QuestionBankItem(
                 collection_id=collection.id,
-                stem=f"AI Agent 题库题 {index}",
-                options_json=["感知环境并采取行动", "只会聊天", "只会搜索", "只会存储"],
+                stem=f"AI Agent curated question {index}",
+                options_json=["Perceive and act", "Only chat", "Only search", "Only store"],
                 answer_index=0,
-                explanation="AI Agent 的关键是感知、规划和行动。",
-                knowledge_point="AI Agent 定义",
+                explanation="AI Agent is about perception, planning, and action.",
+                knowledge_point="AI Agent definition",
                 difficulty="easy",
                 tags_json=["AI Agent"],
             )
@@ -127,7 +151,7 @@ def test_generate_quiz_uses_ai_only_for_missing_questions():
 
     assert len(response.questions) == 5
     assert ai_client.quiz_calls[0]["question_count"] == 2
-    assert "AI Agent 是能够感知环境" in ai_client.quiz_calls[0]["retrieved_context"]
+    assert "AI Agent can perceive context" in ai_client.quiz_calls[0]["retrieved_context"]
     assert [question.sourceType for question in response.questions] == [
         "curated_question",
         "curated_question",
@@ -143,7 +167,7 @@ def test_generate_quiz_falls_back_to_plain_ai_when_no_context_matches():
     ai_client = CountingAiClient()
     service = LearningService(ai_client=ai_client, db=db)
 
-    response = service.generate_quiz("基金定投")
+    response = service.generate_quiz("fund investing")
 
     assert len(response.questions) == 5
     assert ai_client.quiz_calls[0]["question_count"] == 5
@@ -160,25 +184,25 @@ def test_import_curated_payload_upserts_questions_and_chunks():
         {
             "collections": [
                 {
-                    "title": "产品经理面试",
-                    "description": "需求分析和指标设计",
-                    "tags": ["产品", "面试"],
+                    "title": "Product interview",
+                    "description": "Requirement analysis and metrics",
+                    "tags": ["product", "interview"],
                     "chunks": [
                         {
-                            "title": "需求优先级",
-                            "content": "需求优先级可以结合用户价值、业务价值和实现成本判断。",
+                            "title": "Priority",
+                            "content": "Priority can be judged by user value, business value, and implementation cost.",
                             "sourceRef": "manual",
-                            "tags": ["优先级"],
+                            "tags": ["priority"],
                         }
                     ],
                     "questions": [
                         {
-                            "stem": "判断需求优先级时最应该综合考虑什么？",
-                            "options": ["用户价值、业务价值和实现成本", "老板偏好", "页面颜色", "发布时间"],
+                            "stem": "What should priority decisions consider?",
+                            "options": ["Value and cost", "Boss preference", "Color", "Release time"],
                             "answerIndex": 0,
-                            "explanation": "优先级判断需要同时考虑价值和成本。",
-                            "knowledgePoint": "需求优先级",
-                            "tags": ["优先级"],
+                            "explanation": "Priority decisions should consider value and cost.",
+                            "knowledgePoint": "Priority",
+                            "tags": ["priority"],
                         }
                     ],
                 }
@@ -200,15 +224,15 @@ def test_import_curated_payload_supports_multiple_choice_format():
         {
             "collections": [
                 {
-                    "title": "RAG 入门",
+                    "title": "RAG intro",
                     "questions": [
                         {
-                            "stem": "RAG 包含哪些关键步骤？",
+                            "stem": "Which key steps does RAG include?",
                             "questionType": "multiple_choice",
-                            "options": ["检索", "生成", "完全跳过上下文", "只做 UI"],
+                            "options": ["Retrieval", "Generation", "Skip context", "Only UI"],
                             "answerIndexes": [0, 1],
-                            "explanation": "RAG 的关键链路包含检索和生成。",
-                            "knowledgePoint": "RAG 流程",
+                            "explanation": "RAG includes retrieval and generation.",
+                            "knowledgePoint": "RAG flow",
                         }
                     ],
                 }
@@ -219,3 +243,130 @@ def test_import_curated_payload_supports_multiple_choice_format():
     item = db.query(QuestionBankItem).one()
     assert item.question_type == "multiple_choice"
     assert item.answer_indexes_json == [0, 1]
+
+
+def test_hybrid_retrieval_uses_vector_matches_without_keyword_overlap():
+    db = build_db()
+    collection = KnowledgeCollection(title="Vector RAG", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    db.add(
+        QuestionBankItem(
+            collection_id=collection.id,
+            stem="Completely different stem",
+            options_json=["A", "B", "C", "D"],
+            answer_index=0,
+            answer_indexes_json=[0],
+            question_type="single_choice",
+            explanation="Different explanation",
+            knowledge_point="Different point",
+            difficulty="normal",
+            tags_json=[],
+            embedding=make_vector(0),
+        )
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "semantic query",
+        embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
+    )
+
+    assert context.retrieval_version == "hybrid-rag-v1"
+    assert [item.stem for item in context.question_items] == ["Completely different stem"]
+
+
+def test_retrieval_ignores_inactive_collections():
+    db = build_db()
+    inactive = KnowledgeCollection(
+        title="Inactive",
+        source_type="curated",
+        tags_json=["AI Agent"],
+        is_active=False,
+    )
+    db.add(inactive)
+    db.flush()
+    db.add(
+        QuestionBankItem(
+            collection_id=inactive.id,
+            stem="AI Agent inactive question",
+            options_json=["A", "B", "C", "D"],
+            answer_index=0,
+            answer_indexes_json=[0],
+            question_type="single_choice",
+            explanation="AI Agent explanation",
+            knowledge_point="AI Agent",
+            difficulty="normal",
+            tags_json=["AI Agent"],
+            embedding=make_vector(0),
+        )
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "AI Agent",
+        embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
+    )
+
+    assert context.question_items == []
+    assert context.chunks == []
+
+
+def test_import_curated_payload_generates_and_skips_embeddings():
+    db = build_db()
+    embedding_client = FakeEmbeddingClient()
+    payload = {
+        "collections": [
+            {
+                "title": "Embedding Import",
+                "chunks": [{"title": "Chunk", "content": "Chunk content"}],
+                "questions": [
+                    {
+                        "stem": "Question stem",
+                        "options": ["A", "B", "C", "D"],
+                        "answerIndex": 0,
+                        "explanation": "Explanation",
+                        "knowledgePoint": "Point",
+                    }
+                ],
+            }
+        ]
+    }
+
+    first = import_curated_payload_with_stats(db, payload, embedding_client=embedding_client)
+    second = import_curated_payload_with_stats(db, payload, embedding_client=embedding_client)
+
+    assert first.total_imported == 2
+    assert first.embeddings_generated == 2
+    assert first.embeddings_skipped == 0
+    assert second.embeddings_generated == 0
+    assert second.embeddings_skipped == 2
+
+
+def test_import_curated_payload_regenerates_embedding_when_content_changes():
+    db = build_db()
+    embedding_client = FakeEmbeddingClient()
+    payload = {
+        "collections": [
+            {
+                "title": "Embedding Import",
+                "chunks": [{"title": "Chunk", "content": "Chunk content"}],
+            }
+        ]
+    }
+    import_curated_payload_with_stats(db, payload, embedding_client=embedding_client)
+    changed_payload = {
+        "collections": [
+            {
+                "title": "Embedding Import",
+                "chunks": [{"title": "Chunk", "content": "Changed chunk content"}],
+            }
+        ]
+    }
+
+    stats = import_curated_payload_with_stats(db, changed_payload, embedding_client=embedding_client)
+
+    assert stats.embeddings_generated == 1
+    assert stats.embeddings_skipped == 0

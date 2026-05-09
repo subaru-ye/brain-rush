@@ -5,9 +5,13 @@ from uuid import uuid4
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 from .database import Base
 from .prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
+
+
+EMBEDDING_DIMENSIONS = 1536
 
 
 def now_utc() -> datetime:
@@ -106,6 +110,11 @@ class KnowledgeChunk(Base):
     source_ref: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     tags_json: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIMENSIONS), nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    embedding_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    embedded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     collection: Mapped[KnowledgeCollection] = relationship(back_populates="chunks")
@@ -131,6 +140,11 @@ class QuestionBankItem(Base):
     difficulty: Mapped[str] = mapped_column(String(24), nullable=False, default="normal")
     tags_json: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIMENSIONS), nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    embedding_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    embedded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

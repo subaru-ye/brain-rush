@@ -1,17 +1,24 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
+from math import sqrt
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import KnowledgeChunk, QuestionBankItem
+from .config import get_settings
+from .embeddings import EmbeddingClient
+from .models import KnowledgeChunk, KnowledgeCollection, QuestionBankItem
 from .quiz_answers import format_option_indexes
 from .schemas import QuizQuestion
 
 
-RETRIEVAL_VERSION = "curated-rag-v1"
+KEYWORD_RETRIEVAL_VERSION = "curated-rag-v1"
+RETRIEVAL_VERSION = "hybrid-rag-v1"
+VECTOR_CANDIDATE_LIMIT = 20
+KEYWORD_CANDIDATE_LIMIT = 20
 
 
 @dataclass
@@ -56,16 +63,22 @@ class RetrievedContext:
 
 
 def retrieve_curated_context(db: Session, query: str) -> RetrievedContext:
+    embedding_client = EmbeddingClient(get_settings())
+    return retrieve_curated_context_with_client(db, query, embedding_client=embedding_client)
+
+
+def retrieve_curated_context_with_client(
+    db: Session,
+    query: str,
+    *,
+    embedding_client: EmbeddingClient,
+) -> RetrievedContext:
     terms = _search_terms(query)
     if not terms:
         return RetrievedContext()
 
-    question_items = db.scalars(
-        select(QuestionBankItem).where(QuestionBankItem.is_active.is_(True)).limit(300)
-    ).all()
-    chunks = db.scalars(
-        select(KnowledgeChunk).where(KnowledgeChunk.is_active.is_(True)).limit(300)
-    ).all()
+    question_items = _active_questions(db, limit=300)
+    chunks = _active_chunks(db, limit=300)
 
     scored_questions = [
         (score, item)
@@ -80,9 +93,31 @@ def retrieve_curated_context(db: Session, query: str) -> RetrievedContext:
 
     scored_questions.sort(key=lambda value: value[0], reverse=True)
     scored_chunks.sort(key=lambda value: value[0], reverse=True)
+    retrieval_version = KEYWORD_RETRIEVAL_VERSION
+
+    if embedding_client.is_enabled:
+        try:
+            query_embedding = embedding_client.embed_query(query)
+            vector_questions = _vector_question_scores(db, question_items, query_embedding)
+            vector_chunks = _vector_chunk_scores(db, chunks, query_embedding)
+        except Exception:
+            vector_questions = []
+            vector_chunks = []
+        if vector_questions or vector_chunks:
+            scored_questions = _merge_scores(
+                scored_questions[:KEYWORD_CANDIDATE_LIMIT],
+                vector_questions,
+            )
+            scored_chunks = _merge_scores(
+                scored_chunks[:KEYWORD_CANDIDATE_LIMIT],
+                vector_chunks,
+            )
+            retrieval_version = RETRIEVAL_VERSION
+
     return RetrievedContext(
         question_items=[item for _, item in scored_questions[:5]],
         chunks=[chunk for _, chunk in scored_chunks[:5]],
+        retrieval_version=retrieval_version,
     )
 
 
@@ -139,6 +174,118 @@ def _search_terms(query: str) -> list[str]:
     terms = [normalized] if normalized else []
     terms.extend(re.findall(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]{2,}", normalized))
     return list(dict.fromkeys(term for term in terms if term))
+
+
+def _active_questions(db: Session, *, limit: int) -> list[QuestionBankItem]:
+    return db.scalars(
+        select(QuestionBankItem)
+        .join(QuestionBankItem.collection)
+        .where(
+            QuestionBankItem.is_active.is_(True),
+            KnowledgeCollection.is_active.is_(True),
+        )
+        .limit(limit)
+    ).all()
+
+
+def _active_chunks(db: Session, *, limit: int) -> list[KnowledgeChunk]:
+    return db.scalars(
+        select(KnowledgeChunk)
+        .join(KnowledgeChunk.collection)
+        .where(
+            KnowledgeChunk.is_active.is_(True),
+            KnowledgeCollection.is_active.is_(True),
+        )
+        .limit(limit)
+    ).all()
+
+
+def _vector_question_scores(
+    db: Session,
+    fallback_items: list[QuestionBankItem],
+    query_embedding: list[float],
+) -> list[tuple[float, QuestionBankItem]]:
+    if _dialect_name(db) == "postgresql":
+        distance = QuestionBankItem.embedding.cosine_distance(query_embedding).label("distance")
+        rows = db.execute(
+            select(QuestionBankItem, distance)
+            .join(QuestionBankItem.collection)
+            .where(
+                QuestionBankItem.is_active.is_(True),
+                QuestionBankItem.embedding.is_not(None),
+                KnowledgeCollection.is_active.is_(True),
+            )
+            .order_by(distance)
+            .limit(VECTOR_CANDIDATE_LIMIT)
+        ).all()
+        return [(_distance_to_score(row[1]), row[0]) for row in rows]
+    return _python_vector_scores(fallback_items, query_embedding)
+
+
+def _vector_chunk_scores(
+    db: Session,
+    fallback_items: list[KnowledgeChunk],
+    query_embedding: list[float],
+) -> list[tuple[float, KnowledgeChunk]]:
+    if _dialect_name(db) == "postgresql":
+        distance = KnowledgeChunk.embedding.cosine_distance(query_embedding).label("distance")
+        rows = db.execute(
+            select(KnowledgeChunk, distance)
+            .join(KnowledgeChunk.collection)
+            .where(
+                KnowledgeChunk.is_active.is_(True),
+                KnowledgeChunk.embedding.is_not(None),
+                KnowledgeCollection.is_active.is_(True),
+            )
+            .order_by(distance)
+            .limit(VECTOR_CANDIDATE_LIMIT)
+        ).all()
+        return [(_distance_to_score(row[1]), row[0]) for row in rows]
+    return _python_vector_scores(fallback_items, query_embedding)
+
+
+def _dialect_name(db: Session) -> str:
+    return db.get_bind().dialect.name
+
+
+def _distance_to_score(distance: float | None) -> float:
+    if distance is None:
+        return 0
+    return max(0.0, 1.0 - float(distance)) * 20
+
+
+def _python_vector_scores(items, query_embedding: list[float]) -> list[tuple[float, object]]:
+    scored = [
+        (similarity * 20, item)
+        for item in items
+        if (embedding := getattr(item, "embedding", None)) is not None
+        and (similarity := _cosine_similarity(query_embedding, embedding)) > 0
+    ]
+    scored.sort(key=lambda value: value[0], reverse=True)
+    return scored[:VECTOR_CANDIDATE_LIMIT]
+
+
+def _cosine_similarity(left: Iterable[float], right: Iterable[float]) -> float:
+    left_values = [float(value) for value in left]
+    right_values = [float(value) for value in right]
+    if len(left_values) != len(right_values):
+        return 0
+    numerator = sum(a * b for a, b in zip(left_values, right_values, strict=True))
+    left_norm = sqrt(sum(value * value for value in left_values))
+    right_norm = sqrt(sum(value * value for value in right_values))
+    if not left_norm or not right_norm:
+        return 0
+    return numerator / (left_norm * right_norm)
+
+
+def _merge_scores(primary, secondary):
+    merged: dict[str, tuple[float, object]] = {}
+    for score, item in primary:
+        merged[str(item.id)] = (float(score), item)
+    for score, item in secondary:
+        existing_score, _ = merged.get(str(item.id), (0.0, item))
+        merged[str(item.id)] = (existing_score + float(score), item)
+    return sorted(merged.values(), key=lambda value: value[0], reverse=True)
 
 
 def _score_question_item(item: QuestionBankItem, terms: list[str], query: str) -> int:
