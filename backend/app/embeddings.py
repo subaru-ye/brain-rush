@@ -10,6 +10,7 @@ from .quiz_answers import format_option_indexes
 
 
 EMBEDDING_VERSION = "embedding-v1"
+EMBEDDING_BATCH_SIZE = 10
 
 
 class EmbeddingClientError(RuntimeError):
@@ -46,12 +47,15 @@ class EmbeddingClient:
             timeout=self.timeout_seconds,
             max_retries=self.max_retries,
         )
-        response = client.embeddings.create(
-            model=self.model_name,
-            input=texts,
-            dimensions=self.dimensions,
-        )
-        embeddings = [list(item.embedding) for item in response.data]
+        embeddings: list[list[float]] = []
+        for start in range(0, len(texts), EMBEDDING_BATCH_SIZE):
+            batch = texts[start : start + EMBEDDING_BATCH_SIZE]
+            response = client.embeddings.create(
+                model=self.model_name,
+                input=batch,
+                dimensions=self.dimensions,
+            )
+            embeddings.extend(list(item.embedding) for item in response.data)
         if len(embeddings) != len(texts):
             raise EmbeddingClientError("Embedding response count does not match input count")
         for embedding in embeddings:

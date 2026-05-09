@@ -1,0 +1,858 @@
+{
+  "collections": [
+    {
+      "title": "RAG 知识库",
+      "description": "系统整理 RAG（检索增强生成）的基础原理、索引与查询流程、文档预处理、混合检索、Rerank、pgvector、检索评估和工程优化方法。",
+      "tags": [
+        "RAG",
+        "检索增强生成",
+        "向量检索",
+        "Embedding",
+        "知识库",
+        "RAG优化",
+        "混合检索",
+        "重排",
+        "pgvector",
+        "RAG评估",
+        "大模型",
+        "Advanced RAG",
+        "Rerank",
+        "检索优化",
+        "文档处理",
+        "向量数据库",
+        "调参"
+      ],
+      "isActive": true,
+      "chunks": [
+        {
+          "title": "RAG 的基本定义",
+          "content": "RAG 是 Retrieval-Augmented Generation 的缩写，核心思想是在生成答案或题目前，先从外部知识库中检索相关内容，再把检索结果作为上下文提供给语言模型。它将模型内部参数知识与外部可更新知识结合起来，适合处理知识密集型任务、企业知识库问答和需要引用业务资料的生成场景。",
+          "sourceRef": "https://arxiv.org/abs/2005.11401",
+          "tags": [
+            "RAG",
+            "基础概念",
+            "外部知识"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "RAG 的两阶段结构",
+          "content": "一个典型 RAG 系统通常分为索引阶段和查询阶段。索引阶段负责收集资料、清洗文本、切分 chunk、生成 embedding，并把向量和原文元数据存入数据库。查询阶段负责把用户输入转成 query embedding，检索相关 chunk 或题目，再将召回内容拼入提示词，由语言模型完成生成。",
+          "sourceRef": "https://docs.langchain.com/oss/python/langchain/rag",
+          "tags": [
+            "索引阶段",
+            "查询阶段",
+            "系统流程"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "文档切分的作用",
+          "content": "文档切分是 RAG 索引阶段的关键步骤。长文档如果直接作为一个整体进入向量库，检索结果可能过大且不够精确；切分成较小的 chunk 后，检索器可以返回更聚焦的片段。切分粒度需要平衡语义完整性和检索精度，过短会丢上下文，过长会引入噪声。",
+          "sourceRef": "https://docs.langchain.com/oss/python/langchain/retrieval",
+          "tags": [
+            "Chunk",
+            "文档切分",
+            "索引"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "Embedding 的作用",
+          "content": "Embedding 是把文本转换成数值向量的过程。语义相近的文本通常会在向量空间中更接近，因此可以用向量相似度做语义搜索。与单纯关键词匹配相比，embedding 检索更容易命中表达不同但含义相近的内容，例如用户输入和知识库文本没有完全相同的词，也可能被召回。",
+          "sourceRef": "https://openai.com/index/introducing-text-and-code-embeddings/",
+          "tags": [
+            "Embedding",
+            "语义搜索",
+            "向量"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "向量数据库在 RAG 中的角色",
+          "content": "向量数据库负责存储文本 embedding，并支持按照距离或相似度快速检索最相关的向量。RAG 查询时，系统会把用户输入转成 query embedding，再在向量数据库中寻找最相似的知识片段。向量数据库通常还需要保存原文、来源、标签、是否启用等元数据，便于过滤和生成时引用。",
+          "sourceRef": "https://help.openai.com/en/articles/8984342-how-can-i-retrieve-k-nearest-embedding-vectors-quickly",
+          "tags": [
+            "向量数据库",
+            "语义检索",
+            "元数据"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "RAG 与模型微调的区别",
+          "content": "RAG 和微调都可以改善模型在特定任务上的表现，但侧重点不同。RAG 把外部知识作为运行时上下文注入，适合知识经常更新、需要可追溯来源或需要接入私有资料的场景。微调更适合让模型学习稳定的输出风格、格式或任务模式，但不适合频繁更新大量事实知识。",
+          "sourceRef": "https://platform.openai.com/docs/guides/optimizing-llm-accuracy/understanding-the-tools",
+          "tags": [
+            "RAG",
+            "微调",
+            "知识更新"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "关键词检索与向量检索的互补性",
+          "content": "关键词检索擅长处理专有名词、编号、明确术语和短查询，向量检索擅长处理语义相近但字面不一致的表达。实际 RAG 系统常把两者结合起来，先分别召回候选内容，再合并去重和排序，以提高覆盖率和鲁棒性。",
+          "sourceRef": "https://platform.openai.com/docs/guides/retrieval",
+          "tags": [
+            "混合检索",
+            "关键词检索",
+            "向量检索"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "Top K 召回的意义",
+          "content": "Top K 表示检索阶段返回相似度最高的前 K 条候选内容。K 太小可能漏掉有用信息，K 太大可能把噪声带入提示词并占用上下文窗口。工程上通常会先召回较多候选，再经过过滤、重排或综合打分后取较少内容进入最终提示词。",
+          "sourceRef": "https://docs.langchain.com/oss/python/langchain/retrieval",
+          "tags": [
+            "Top K",
+            "召回",
+            "上下文窗口"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "重排在 RAG 中的作用",
+          "content": "重排通常发生在初步召回之后，用更精细的模型或规则重新评估候选内容与查询的相关性。它可以缓解向量检索只按整体语义相似度排序的问题，帮助把真正能回答问题的片段放到更靠前的位置。",
+          "sourceRef": "https://docs.langchain.com/oss/python/integrations/retrievers/index",
+          "tags": [
+            "重排",
+            "召回质量",
+            "检索优化"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "pgvector 的距离与索引",
+          "content": "pgvector 是 PostgreSQL 的向量相似度搜索扩展，支持向量列、距离计算和近似最近邻索引。常见距离包括 L2、内积和 cosine distance。对于文本 embedding 场景，cosine 距离常用于衡量语义相似度；数据量增大后可以使用 IVFFlat 或 HNSW 索引提升检索速度。",
+          "sourceRef": "https://github.com/pgvector/pgvector",
+          "tags": [
+            "pgvector",
+            "cosine",
+            "IVFFlat",
+            "HNSW"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "RAG 评估的两个层面",
+          "content": "RAG 评估通常需要同时看检索质量和生成质量。检索质量关注是否召回了相关证据，例如召回率、上下文相关性和命中率；生成质量关注模型是否忠实使用上下文、答案是否正确、是否存在幻觉或遗漏。只评估最终答案容易掩盖检索阶段的问题。",
+          "sourceRef": "https://docs.langchain.com/langsmith/evaluate-rag-tutorial",
+          "tags": [
+            "RAG评估",
+            "检索质量",
+            "生成质量"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "RAGAS 的评估思路",
+          "content": "RAGAS 是面向 RAG 系统的自动化评估方法，强调对检索和生成链路分别评估。常见评估维度包括上下文相关性、答案忠实度和答案相关性。它的价值在于帮助开发者定位问题来自检索不足、上下文噪声，还是生成阶段没有正确使用证据。",
+          "sourceRef": "https://arxiv.org/abs/2309.15217",
+          "tags": [
+            "RAGAS",
+            "自动化评估",
+            "忠实度"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "RAG 不能完全消除幻觉",
+          "content": "RAG 可以通过提供外部证据降低模型编造的概率，但不能保证完全消除幻觉。如果检索结果不相关、上下文过多、资料本身过期或提示词没有要求基于证据回答，模型仍可能生成错误内容。因此生产系统需要检索评估、来源追踪、上下文过滤和回答约束。",
+          "sourceRef": "https://cookbook.openai.com/examples/evaluation/evaluate_rag_with_llamaindex",
+          "tags": [
+            "幻觉",
+            "评估",
+            "来源追踪"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "RAG的定义与核心价值",
+          "content": "RAG全称是Retrieval Augmented Generation，即检索增强生成，核心是给大模型外挂外部知识库，解决大模型知识滞后性（训练数据截止时间点）和私有数据缺失两大问题，避免重新训练或微调模型的高成本。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "基础概念"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "传统RAG的核心流程",
+          "content": "传统RAG流程可概括为三步：找、缝、写。具体步骤为：1. 用户提问时，通过Embedding模型将问题向量化，从向量数据库中检索相关资料片段；2. 将用户问题与检索到的资料片段拼接，构建信息量更大的Prompt；3. 将Prompt输入大模型，让模型基于资料生成准确答案。也可细分为文本向量化、向量数据库检索、构建Prompt、生成回答四步。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "流程"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "Advanced RAG的优化方向",
+          "content": "Advanced RAG针对传统RAG检索不准、上下文断裂、生成质量不稳定的问题，在三个阶段增加优化：1. 检索前优化：包括滑动窗口分块、元数据添加、分层索引、查询重写、查询扩展；2. 检索中优化：包括动态嵌入、混合检索、文档嵌入优化、递归块合并；3. 检索后优化：包括重排序、提示压缩、上下文重构、内容过滤。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "Advanced RAG",
+            "优化技术"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "Rerank的定义与作用",
+          "content": "Rerank是RAG中对初步检索返回的候选文档列表进行再次排序的过程，核心是平衡速度与精度。向量检索（Bi-Encoder）速度快但语义理解较浅，Rerank（通常为Cross-Encoder）通过将query和document拼接为一个序列送入模型，计算深层交互并输出相关性分数，精准筛选Top-K相关文档，避免大模型因低质量文档生成错误内容。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "Rerank",
+            "优化技术"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "Embedding模型与Reranker模型的区别",
+          "content": "Embedding模型采用Bi-Encoder架构，query和document分别编码为向量，通过点积或余弦相似度计算分数，速度快但交互不深；Reranker模型采用Cross-Encoder架构，将query和document拼成一个序列送入模型，输出相关性分数，交互充分、精度更高，但速度较慢，仅适用于少量候选文档。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "Embedding",
+            "Reranker",
+            "模型对比"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "RAG的局限性与解决方案",
+          "content": "RAG的局限性包括：1. 检索质量决定上限，需通过混合检索、优化分块策略、添加Rerank层解决；2. 上下文窗口有限，可通过Rerank+Top-K截断、摘要压缩、分块处理解决；3. 实时性受限于索引更新，需定期更新知识库并重新做Embedding入库。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "局限性",
+            "解决方案"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "RAG与模型微调的区别及适用场景",
+          "content": "微调是将知识“刻”进模型参数，适合改变模型行为风格或学习特定任务模式的场景（如特定语气生成），但成本高、知识更新需重新训练；RAG是将知识放在外部，适合知识频繁更新、需引用来源或私有数据量大的场景，无需修改模型，只需更新知识库。让模型知道更多事实选RAG，让模型换方式说话选微调。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "模型微调",
+            "对比"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "RAG检索效果优化核心环节",
+          "content": "RAG检索效果差通常出在文档切片、查询理解、检索策略三个环节，优化需从源头抓起，分为三大核心方向：1.文档预处理；2.查询增强；3.混合检索，同时可配合重排序进一步提升效果。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "检索优化",
+            "核心环节"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "文档预处理优化策略",
+          "content": "文档预处理是优化的基础步骤，包括：1.数据清洗：去除水印、页眉页脚、乱码，保证内容干净；2.语义切片：避免粗暴固定长度切分，推荐按段落、小节切分，或使用LangChain的RecursiveCharacterTextSplitter先按段落切分、再按句子切分；3.元数据注入：为每个切片添加来源文档、章节、日期等标签，支持检索时的精确过滤。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "文档预处理",
+            "切片策略"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "多格式文档的切片处理方案",
+          "content": "不同格式文档需差异化处理：1.PDF：用PyMuPDF或Unstructured提取文本，保留段落结构，表格单独处理；2.Word：按大纲级别切分，一级标题下的内容作为一个chunk；3.网页：先清洗HTML标签，按DOM结构或<article>标签提取正文。建议构建预处理Pipeline，根据文件类型走不同处理分支，最终输出标准化切片格式。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "文档预处理",
+            "多格式文档"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "查询增强优化方法",
+          "content": "针对用户口语化、模糊的提问，可通过两种方式优化：1.LLM查询重写：将口语化问题转化为规范表达，提升向量相似度匹配效果；2.查询扩展：将一个问题拆解为3-5个不同角度的子查询，合并召回结果，扩大信息覆盖范围。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "查询增强",
+            "优化方法"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "混合检索与重排序优化",
+          "content": "解决纯向量检索对专有名词、代码片段、数字召回率低的问题，采用向量检索+BM25关键词检索组合，通过RRF算法融合排序，综合语义匹配与精确匹配的优势。召回top50后，使用Cross-Encoder重排序模型精排，将真正相关的结果排到前5，Cross-Encoder比Bi-Encoder准确率高10-15%，但速度较慢，仅用于精排。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "混合检索",
+            "重排序"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "向量检索调参细节",
+          "content": "使用PGVector或Milvus进行向量检索时，关键参数包括：1.相似度阈值：一般设0.7-0.8，低于0.6的结果基本为噪音，建议先不设阈值，根据相似度分布再确定；2.top_k数量：召回阶段设为50-100，后续通过重排序筛选，喂给大模型时控制在3-5个，避免干扰；3.索引类型：HNSW召回率比IVFFlat高5-10%，但内存占用大，百万级数据用HNSW，千万级以上考虑IVFFlat+分区；4.Embedding维度：OpenAI的text-embedding-3-large支持256/1024/3072维度，维度越高精度越高但速度越慢、成本越高，大多数场景1024维够用。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "向量检索",
+            "调参"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "检索结果去重方法",
+          "content": "滑动窗口切片易导致相邻切片内容重叠，检索结果出现重复内容，解决方法包括：1.召回后去重：用MinHash或SimHash计算相似度，相似度超过0.9的只保留一条；2.检索时去重：添加document_id过滤，同一个文档最多召回2-3条；3.使用LangChain的MultiQueryRetriever，其内置去重逻辑可直接使用。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "检索优化",
+            "去重"
+          ],
+          "isActive": true
+        },
+        {
+          "title": "RAG检索效果评估指标与方法",
+          "content": "常用评估指标包括Recall@K和MRR：1.Recall@K：查看前K条结果中是否包含正确答案，K一般取5或10；2.MRR：正确答案排名的倒数的平均值，排名越靠前分数越高。评估需要标注好的测试集，包含问题和对应的正确文档ID，可先人工标注100-200条作为基线，调参后对比变化；无人力标注时，可用大模型自动判断检索结果是否包含答案，虽不完全准确但能看趋势。",
+          "sourceRef": "screenshot:manual",
+          "tags": [
+            "RAG",
+            "检索评估",
+            "指标"
+          ],
+          "isActive": true
+        }
+      ],
+      "questions": [
+        {
+          "stem": "RAG 的核心思想是什么？",
+          "questionType": "single_choice",
+          "options": [
+            "生成前先从外部知识库检索相关内容，再将其作为上下文提供给模型",
+            "只依赖模型训练时记住的参数知识，不使用外部资料",
+            "把所有用户输入都直接写入数据库，不进行检索",
+            "只通过修改前端页面来提升回答准确率"
+          ],
+          "answerIndex": 0,
+          "explanation": "RAG 的关键是检索增强：先检索外部知识，再把相关内容提供给模型生成。",
+          "knowledgePoint": "RAG 的基本定义",
+          "difficulty": "easy",
+          "tags": [
+            "RAG",
+            "基础概念"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "典型 RAG 系统的索引阶段通常包含哪些操作？",
+          "questionType": "multiple_choice",
+          "options": [
+            "清洗和切分文档",
+            "为 chunk 生成 embedding",
+            "把向量和元数据存入数据库",
+            "根据用户答案直接生成学习报告"
+          ],
+          "answerIndexes": [
+            0,
+            1,
+            2
+          ],
+          "explanation": "索引阶段负责把知识资料整理成可检索形态，包括切分、向量化和入库；生成学习报告属于业务生成流程，不是索引阶段的核心动作。",
+          "knowledgePoint": "RAG 的两阶段结构",
+          "difficulty": "normal",
+          "tags": [
+            "索引阶段",
+            "Embedding",
+            "数据库"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "为什么 RAG 通常需要把长文档切分成 chunk？",
+          "questionType": "single_choice",
+          "options": [
+            "为了让检索结果更聚焦，并减少无关上下文干扰",
+            "因为向量数据库不能存储任何长文本元数据",
+            "因为语言模型只能处理单个汉字",
+            "为了避免保存原始知识来源"
+          ],
+          "answerIndex": 0,
+          "explanation": "合理切分可以提升检索粒度和上下文聚焦度，但切得过短也可能破坏语义完整性。",
+          "knowledgePoint": "文档切分的作用",
+          "difficulty": "easy",
+          "tags": [
+            "Chunk",
+            "文档切分"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "关于 embedding 在 RAG 中的作用，下列哪些说法正确？",
+          "questionType": "multiple_choice",
+          "options": [
+            "它把文本转换成数值向量",
+            "它可以支持语义相似度检索",
+            "它可以让表达不同但语义相近的内容被召回",
+            "它会直接替代语言模型完成最终回答"
+          ],
+          "answerIndexes": [
+            0,
+            1,
+            2
+          ],
+          "explanation": "Embedding 用于语义表示和相似度检索，最终回答通常仍由语言模型结合上下文生成。",
+          "knowledgePoint": "Embedding 的作用",
+          "difficulty": "normal",
+          "tags": [
+            "Embedding",
+            "语义搜索"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "RAG 相比把知识全部写进模型参数，更适合哪类场景？",
+          "questionType": "single_choice",
+          "options": [
+            "知识经常更新且需要接入私有资料的场景",
+            "完全不需要外部知识的固定格式转换",
+            "只需要改变按钮颜色的前端页面",
+            "不允许保存任何来源和元数据的系统"
+          ],
+          "answerIndex": 0,
+          "explanation": "RAG 的优势在于运行时检索外部知识，适合动态知识、私有资料和需要来源追踪的场景。",
+          "knowledgePoint": "RAG 与模型微调的区别",
+          "difficulty": "normal",
+          "tags": [
+            "RAG",
+            "知识更新",
+            "私有知识库"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "在用户查询阶段，RAG 系统一般会先做什么？",
+          "questionType": "single_choice",
+          "options": [
+            "把用户输入转换成 query embedding，用于检索相关知识",
+            "删除知识库中所有历史向量",
+            "跳过检索，直接返回数据库第一条记录",
+            "把用户输入保存为新的系统配置"
+          ],
+          "answerIndex": 0,
+          "explanation": "查询阶段通常先将用户输入向量化，再与知识库中已保存的向量做相似度匹配。",
+          "knowledgePoint": "RAG 的两阶段结构",
+          "difficulty": "easy",
+          "tags": [
+            "查询阶段",
+            "Embedding",
+            "向量检索"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "为什么很多 RAG 系统会采用混合检索？",
+          "questionType": "single_choice",
+          "options": [
+            "因为关键词检索和向量检索各有优势，结合后能提升召回覆盖率",
+            "因为混合检索可以完全取消数据库",
+            "因为向量检索不能处理任何自然语言",
+            "因为关键词检索一定比向量检索更慢"
+          ],
+          "answerIndex": 0,
+          "explanation": "关键词检索擅长精确术语，向量检索擅长语义相似；混合检索利用两者互补性提升效果。",
+          "knowledgePoint": "关键词检索与向量检索的互补性",
+          "difficulty": "normal",
+          "tags": [
+            "混合检索",
+            "召回"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "Top K 设置过大可能带来什么问题？",
+          "questionType": "single_choice",
+          "options": [
+            "引入更多无关上下文，占用提示词窗口并干扰生成",
+            "导致知识库中所有 embedding 被自动删除",
+            "使语言模型无法读取任何输入",
+            "让所有检索结果都变成完全相同"
+          ],
+          "answerIndex": 0,
+          "explanation": "Top K 过大可能带来噪声和上下文窗口压力，因此常需要过滤、重排或综合打分。",
+          "knowledgePoint": "Top K 召回的意义",
+          "difficulty": "easy",
+          "tags": [
+            "Top K",
+            "上下文窗口"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "重排通常位于 RAG 链路的哪个位置？",
+          "questionType": "single_choice",
+          "options": [
+            "初步召回之后、最终拼接上下文之前",
+            "用户提交问题之前",
+            "数据库表创建之前",
+            "模型输出答案之后才第一次检索"
+          ],
+          "answerIndex": 0,
+          "explanation": "重排用于对初步召回的候选内容重新排序，通常发生在召回之后、构造最终上下文之前。",
+          "knowledgePoint": "重排在 RAG 中的作用",
+          "difficulty": "normal",
+          "tags": [
+            "重排",
+            "检索优化"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "关于 pgvector，下列哪些说法是正确的？",
+          "questionType": "multiple_choice",
+          "options": [
+            "它是 PostgreSQL 的向量相似度搜索扩展",
+            "它支持 cosine distance 等距离计算",
+            "它可以使用 IVFFlat 或 HNSW 等近似最近邻索引",
+            "它只能保存纯文本，不能保存向量"
+          ],
+          "answerIndexes": [
+            0,
+            1,
+            2
+          ],
+          "explanation": "pgvector 支持向量列、距离计算和向量索引，适合在 PostgreSQL 中实现向量检索。",
+          "knowledgePoint": "pgvector 的距离与索引",
+          "difficulty": "normal",
+          "tags": [
+            "pgvector",
+            "向量索引"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "评估 RAG 系统时，为什么不能只看最终答案？",
+          "questionType": "single_choice",
+          "options": [
+            "因为最终答案错误可能来自检索失败，也可能来自生成阶段没有正确使用证据",
+            "因为最终答案一定和检索结果无关",
+            "因为 RAG 系统没有检索阶段",
+            "因为只要使用向量数据库就不需要评估"
+          ],
+          "answerIndex": 0,
+          "explanation": "RAG 问题可能来自检索或生成两个阶段，单看最终答案不利于定位原因。",
+          "knowledgePoint": "RAG 评估的两个层面",
+          "difficulty": "normal",
+          "tags": [
+            "RAG评估",
+            "检索质量",
+            "生成质量"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "RAGAS 类评估方法通常关注哪些维度？",
+          "questionType": "multiple_choice",
+          "options": [
+            "上下文相关性",
+            "答案忠实度",
+            "答案相关性",
+            "按钮是否使用圆角"
+          ],
+          "answerIndexes": [
+            0,
+            1,
+            2
+          ],
+          "explanation": "RAGAS 关注 RAG 链路中的检索和生成质量，常见维度包括上下文相关性、答案忠实度和答案相关性。",
+          "knowledgePoint": "RAGAS 的评估思路",
+          "difficulty": "normal",
+          "tags": [
+            "RAGAS",
+            "评估指标"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "为什么说 RAG 不能完全消除幻觉？",
+          "questionType": "single_choice",
+          "options": [
+            "因为检索结果可能不相关、资料可能过期，模型也可能没有忠实使用上下文",
+            "因为 RAG 从来不使用外部知识",
+            "因为 embedding 会自动生成最终答案",
+            "因为向量数据库只支持图片检索"
+          ],
+          "answerIndex": 0,
+          "explanation": "RAG 可以降低幻觉风险，但检索质量、资料时效性和生成约束都会影响最终答案可靠性。",
+          "knowledgePoint": "RAG 不能完全消除幻觉",
+          "difficulty": "normal",
+          "tags": [
+            "幻觉",
+            "可靠性",
+            "评估"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "在文本 embedding 的向量检索场景中，cosine distance 常用于衡量什么？",
+          "questionType": "single_choice",
+          "options": [
+            "两个文本向量在语义表示上的相似程度",
+            "数据库文件在磁盘上的物理大小",
+            "用户答题消耗的秒数",
+            "前端页面的加载速度"
+          ],
+          "answerIndex": 0,
+          "explanation": "cosine distance 常用于衡量向量方向差异，在文本 embedding 场景中可用于语义相似度排序。",
+          "knowledgePoint": "pgvector 的距离与索引",
+          "difficulty": "easy",
+          "tags": [
+            "cosine",
+            "向量检索"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "RAG的全称是什么？",
+          "questionType": "single_choice",
+          "options": [
+            "Retrieval Augmented Generation",
+            "Random Access Generation",
+            "Real-time Auto Generation",
+            "Rule-based Auto Generation"
+          ],
+          "answerIndex": 0,
+          "explanation": "RAG的全称是Retrieval Augmented Generation，即检索增强生成，核心是为大模型外挂外部知识库。",
+          "knowledgePoint": "RAG基础概念",
+          "difficulty": "easy",
+          "tags": [
+            "RAG",
+            "基础概念"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "以下哪项不属于传统RAG的核心流程步骤？",
+          "questionType": "single_choice",
+          "options": [
+            "从向量数据库检索相关资料片段",
+            "将问题与检索结果拼接构建Prompt",
+            "直接修改大模型参数注入知识",
+            "大模型基于Prompt生成回答"
+          ],
+          "answerIndex": 2,
+          "explanation": "传统RAG的核心流程是“找、缝、写”，即检索、拼接Prompt、生成回答，不涉及修改大模型参数，修改参数属于微调的范畴。",
+          "knowledgePoint": "RAG流程",
+          "difficulty": "easy",
+          "tags": [
+            "RAG",
+            "流程"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "Advanced RAG的优化阶段不包括以下哪一项？",
+          "questionType": "single_choice",
+          "options": [
+            "检索前优化",
+            "检索中优化",
+            "模型重训练优化",
+            "检索后优化"
+          ],
+          "answerIndex": 2,
+          "explanation": "Advanced RAG针对传统RAG的问题，分为检索前、检索中、检索后三个阶段优化，不包含模型重训练优化。",
+          "knowledgePoint": "Advanced RAG优化",
+          "difficulty": "normal",
+          "tags": [
+            "Advanced RAG",
+            "优化技术"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "关于Rerank的作用，以下说法错误的是？",
+          "questionType": "single_choice",
+          "options": [
+            "对初步检索的候选文档再次排序",
+            "平衡速度与精度，提升相关性",
+            "替代向量检索的步骤，直接生成候选文档",
+            "避免大模型基于低质量文档生成错误内容"
+          ],
+          "answerIndex": 2,
+          "explanation": "Rerank是对向量检索返回的候选文档进行再次排序，不能替代向量检索步骤，向量检索负责快速召回，Rerank负责精准筛选。",
+          "knowledgePoint": "Rerank作用",
+          "difficulty": "normal",
+          "tags": [
+            "RAG",
+            "Rerank"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "Embedding模型与Reranker模型的对比，以下说法正确的是？",
+          "questionType": "single_choice",
+          "options": [
+            "Embedding模型采用Cross-Encoder架构",
+            "Reranker模型速度快，适合处理大量候选文档",
+            "Embedding模型的query和document直接交互，语义理解更深",
+            "Reranker模型将query和document拼接送入模型，相关性判断更准"
+          ],
+          "answerIndex": 3,
+          "explanation": "Embedding模型是Bi-Encoder，query和document分别编码，速度快但交互不深；Reranker模型是Cross-Encoder，将query和document拼接送入模型，交互充分，相关性判断更准，但速度较慢，仅适用于少量候选文档。",
+          "knowledgePoint": "Embedding与Reranker对比",
+          "difficulty": "normal",
+          "tags": [
+            "Embedding",
+            "Reranker",
+            "模型对比"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "当RAG检索的文档片段超过大模型上下文窗口时，可采用的解决方法不包括？",
+          "questionType": "single_choice",
+          "options": [
+            "使用Rerank模型筛选Top-K相关文档",
+            "对长文档进行摘要压缩提升信息密度",
+            "直接将所有文档片段拼接送入模型",
+            "分块处理问题并汇总回答"
+          ],
+          "answerIndex": 2,
+          "explanation": "当检索片段超过上下文窗口时，直接拼接会超出模型输入限制，无法处理；正确做法包括Rerank+Top-K截断、摘要压缩、分块处理等。",
+          "knowledgePoint": "RAG局限性解决方案",
+          "difficulty": "normal",
+          "tags": [
+            "RAG",
+            "局限性",
+            "解决方案"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "以下哪项不属于RAG检索效果优化的核心环节？",
+          "questionType": "single_choice",
+          "options": [
+            "文档预处理",
+            "查询增强",
+            "模型重训练",
+            "混合检索"
+          ],
+          "answerIndex": 2,
+          "explanation": "RAG检索效果优化的核心环节为文档预处理、查询增强、混合检索，模型重训练属于微调的范畴，不属于检索优化环节。",
+          "knowledgePoint": "RAG检索优化核心环节",
+          "difficulty": "easy",
+          "tags": [
+            "RAG",
+            "检索优化"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "关于文档预处理中的切片策略，以下说法错误的是？",
+          "questionType": "single_choice",
+          "options": [
+            "推荐按段落、小节进行语义切片",
+            "固定512 tokens一刀切的方式简单高效，优先使用",
+            "可使用LangChain的RecursiveCharacterTextSplitter分层次切分",
+            "切片后添加元数据标签支持精确过滤"
+          ],
+          "answerIndex": 1,
+          "explanation": "固定长度一刀切的切片方式过于粗暴，容易截断句子，影响语义完整性，不推荐优先使用，应采用语义边界切分策略。",
+          "knowledgePoint": "文档预处理切片策略",
+          "difficulty": "easy",
+          "tags": [
+            "RAG",
+            "文档预处理",
+            "切片策略"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "针对用户口语化提问，查询增强的常用方法不包括？",
+          "questionType": "single_choice",
+          "options": [
+            "LLM查询重写为规范表达",
+            "拆解问题为多个子查询扩展召回",
+            "直接修改用户提问的核心意图",
+            "通过查询扩展扩大信息覆盖范围"
+          ],
+          "answerIndex": 2,
+          "explanation": "查询增强的核心是优化问题的表达形式或扩展召回范围，不会直接修改用户提问的核心意图，否则会偏离用户真实需求。",
+          "knowledgePoint": "查询增强优化方法",
+          "difficulty": "normal",
+          "tags": [
+            "RAG",
+            "查询增强"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "关于混合检索策略，以下说法正确的是？",
+          "questionType": "single_choice",
+          "options": [
+            "仅使用向量检索即可满足所有场景需求",
+            "向量检索+BM25关键词检索组合，通过RRF算法融合排序",
+            "BM25检索对语义匹配的支持优于向量检索",
+            "混合检索无需考虑专有名词和数字的召回问题"
+          ],
+          "answerIndex": 1,
+          "explanation": "纯向量检索对专有名词、代码片段、数字召回率低，混合检索采用向量检索+BM25关键词检索组合，通过RRF算法融合排序，可综合语义匹配与精确匹配的优势。",
+          "knowledgePoint": "混合检索策略",
+          "difficulty": "normal",
+          "tags": [
+            "RAG",
+            "混合检索"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "向量检索中关于top_k参数的设置，以下说法正确的是？",
+          "questionType": "single_choice",
+          "options": [
+            "召回阶段和喂给大模型时都应设置为3-5个",
+            "召回阶段设为50-100，后续通过重排序筛选，喂给大模型时控制在3-5个",
+            "top_k设置越大，检索结果质量越高，无负面影响",
+            "top_k设置越小，越能避免大模型被干扰，应尽量设为1"
+          ],
+          "answerIndex": 1,
+          "explanation": "向量检索的top_k参数，召回阶段可设为50-100，扩大候选范围，后续通过重排序筛选；喂给大模型时控制在3-5个，避免过多内容干扰模型生成。",
+          "knowledgePoint": "向量检索调参细节",
+          "difficulty": "normal",
+          "tags": [
+            "RAG",
+            "向量检索",
+            "调参"
+          ],
+          "isActive": true
+        },
+        {
+          "stem": "RAG检索效果评估中，Recall@K指标的含义是？",
+          "questionType": "single_choice",
+          "options": [
+            "正确答案在检索结果中的排名倒数平均值",
+            "前K条结果中是否包含正确答案",
+            "检索结果的相似度平均值",
+            "检索结果的去重率"
+          ],
+          "answerIndex": 1,
+          "explanation": "Recall@K是指查看前K条检索结果中是否包含正确答案，K一般取5或10；MRR才是正确答案排名的倒数的平均值。",
+          "knowledgePoint": "RAG检索效果评估指标",
+          "difficulty": "normal",
+          "tags": [
+            "RAG",
+            "检索评估",
+            "指标"
+          ],
+          "isActive": true
+        }
+      ]
+    }
+  ]
+}
