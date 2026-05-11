@@ -9,7 +9,7 @@ from app.curated_import import import_curated_payload, import_curated_payload_wi
 from app.database import Base
 from app.llm import AiQuizDraft
 from app.models import KnowledgeChunk, KnowledgeCollection, QuestionBankItem
-from app.rag import retrieve_curated_context_with_client
+from app.rag import debug_retrieve_curated_context, retrieve_curated_context_with_client
 from app.schemas import QuizQuestion
 from app.services import LearningService
 
@@ -275,6 +275,52 @@ def test_hybrid_retrieval_uses_vector_matches_without_keyword_overlap():
 
     assert context.retrieval_version == "hybrid-rag-v1"
     assert [item.stem for item in context.question_items] == ["Completely different stem"]
+
+
+def test_debug_retrieval_reports_keyword_and_vector_scores():
+    db = build_db()
+    collection = KnowledgeCollection(title="Vector RAG", source_type="curated", tags_json=["RAG"])
+    db.add(collection)
+    db.flush()
+    db.add(
+        KnowledgeChunk(
+            collection_id=collection.id,
+            title="RAG debug chunk",
+            content="RAG debug retrieval content",
+            source_ref="manual",
+            tags_json=["RAG"],
+            embedding=make_vector(0),
+        )
+    )
+    db.add(
+        QuestionBankItem(
+            collection_id=collection.id,
+            stem="RAG debug question",
+            options_json=["A", "B", "C", "D"],
+            answer_index=0,
+            answer_indexes_json=[0],
+            question_type="single_choice",
+            explanation="RAG debug explanation",
+            knowledge_point="RAG debug",
+            difficulty="normal",
+            tags_json=["RAG"],
+            embedding=make_vector(0),
+        )
+    )
+    db.commit()
+
+    result = debug_retrieve_curated_context(
+        db,
+        "RAG debug",
+        embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
+    )
+
+    assert result.retrieval_version == "hybrid-rag-v1"
+    assert result.questions[0].title == "RAG debug question"
+    assert result.questions[0].keyword_score > 0
+    assert result.questions[0].vector_score > 0
+    assert result.chunks[0].title == "RAG debug chunk"
+    assert result.chunks[0].source_ref == "manual"
 
 
 def test_retrieval_ignores_inactive_collections():

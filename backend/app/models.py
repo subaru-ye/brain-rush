@@ -92,7 +92,39 @@ class KnowledgeCollection(Base):
     )
 
     chunks: Mapped[list["KnowledgeChunk"]] = relationship(back_populates="collection")
+    documents: Mapped[list["KnowledgeDocument"]] = relationship(back_populates="collection")
     question_items: Mapped[list["QuestionBankItem"]] = relationship(back_populates="collection")
+
+
+class KnowledgeDocument(Base):
+    __tablename__ = "knowledge_documents"
+    __table_args__ = (
+        Index("ix_knowledge_documents_collection_active", "collection_id", "is_active"),
+        Index("ix_knowledge_documents_source_type", "source_type"),
+    )
+
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=new_id)
+    collection_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("knowledge_collections.id"),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(180), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(40), nullable=False, default="manual")
+    source_uri: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=now_utc,
+        onupdate=now_utc,
+    )
+
+    collection: Mapped[KnowledgeCollection] = relationship(back_populates="documents")
+    chunks: Mapped[list["KnowledgeChunk"]] = relationship(back_populates="document")
 
 
 class KnowledgeChunk(Base):
@@ -108,6 +140,11 @@ class KnowledgeChunk(Base):
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     source_ref: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    document_id: Mapped[str | None] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("knowledge_documents.id"),
+        nullable=True,
+    )
     tags_json: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIMENSIONS), nullable=True)
@@ -118,6 +155,7 @@ class KnowledgeChunk(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     collection: Mapped[KnowledgeCollection] = relationship(back_populates="chunks")
+    document: Mapped[KnowledgeDocument | None] = relationship(back_populates="chunks")
 
 
 class QuestionBankItem(Base):

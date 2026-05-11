@@ -62,6 +62,50 @@ class RetrievedContext:
         return "\n\n---\n\n".join(parts)
 
 
+@dataclass
+class RetrievalDebugMatch:
+    kind: str
+    id: str
+    collection_id: str
+    collection_title: str
+    title: str
+    keyword_score: float
+    vector_score: float
+    total_score: float
+    tags: list[str]
+    source_ref: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "kind": self.kind,
+            "id": self.id,
+            "collectionId": self.collection_id,
+            "collectionTitle": self.collection_title,
+            "title": self.title,
+            "keywordScore": round(self.keyword_score, 4),
+            "vectorScore": round(self.vector_score, 4),
+            "totalScore": round(self.total_score, 4),
+            "tags": self.tags,
+            "sourceRef": self.source_ref,
+        }
+
+
+@dataclass
+class RetrievalDebugResult:
+    query: str
+    retrieval_version: str
+    questions: list[RetrievalDebugMatch]
+    chunks: list[RetrievalDebugMatch]
+
+    def to_dict(self) -> dict:
+        return {
+            "query": self.query,
+            "retrievalVersion": self.retrieval_version,
+            "questions": [item.to_dict() for item in self.questions],
+            "chunks": [item.to_dict() for item in self.chunks],
+        }
+
+
 def retrieve_curated_context(db: Session, query: str) -> RetrievedContext:
     embedding_client = EmbeddingClient(get_settings())
     return retrieve_curated_context_with_client(db, query, embedding_client=embedding_client)
@@ -118,6 +162,69 @@ def retrieve_curated_context_with_client(
         question_items=[item for _, item in scored_questions[:5]],
         chunks=[chunk for _, chunk in scored_chunks[:5]],
         retrieval_version=retrieval_version,
+    )
+
+
+def debug_retrieve_curated_context(
+    db: Session,
+    query: str,
+    *,
+    embedding_client: EmbeddingClient | None = None,
+    limit: int = 5,
+) -> RetrievalDebugResult:
+    embedding_client = embedding_client or EmbeddingClient(get_settings())
+    terms = _search_terms(query)
+    if not terms:
+        return RetrievalDebugResult(query=query, retrieval_version=KEYWORD_RETRIEVAL_VERSION, questions=[], chunks=[])
+
+    question_items = _active_questions(db, limit=300)
+    chunks = _active_chunks(db, limit=300)
+    question_keyword_scores = {
+        str(item.id): float(score)
+        for item in question_items
+        if (score := _score_question_item(item, terms, query)) > 0
+    }
+    chunk_keyword_scores = {
+        str(chunk.id): float(score)
+        for chunk in chunks
+        if (score := _score_chunk(chunk, terms, query)) > 0
+    }
+    question_vector_scores: dict[str, float] = {}
+    chunk_vector_scores: dict[str, float] = {}
+    retrieval_version = KEYWORD_RETRIEVAL_VERSION
+
+    if embedding_client.is_enabled:
+        try:
+            query_embedding = embedding_client.embed_query(query)
+            question_vector_scores = {
+                str(item.id): float(score)
+                for score, item in _vector_question_scores(db, question_items, query_embedding)
+            }
+            chunk_vector_scores = {
+                str(chunk.id): float(score)
+                for score, chunk in _vector_chunk_scores(db, chunks, query_embedding)
+            }
+        except Exception:
+            question_vector_scores = {}
+            chunk_vector_scores = {}
+        if question_vector_scores or chunk_vector_scores:
+            retrieval_version = RETRIEVAL_VERSION
+
+    return RetrievalDebugResult(
+        query=query,
+        retrieval_version=retrieval_version,
+        questions=_debug_question_matches(
+            question_items,
+            question_keyword_scores,
+            question_vector_scores,
+            limit=limit,
+        ),
+        chunks=_debug_chunk_matches(
+            chunks,
+            chunk_keyword_scores,
+            chunk_vector_scores,
+            limit=limit,
+        ),
     )
 
 
@@ -286,6 +393,57 @@ def _merge_scores(primary, secondary):
         existing_score, _ = merged.get(str(item.id), (0.0, item))
         merged[str(item.id)] = (existing_score + float(score), item)
     return sorted(merged.values(), key=lambda value: value[0], reverse=True)
+
+
+def _debug_question_matches(
+    items: list[QuestionBankItem],
+    keyword_scores: dict[str, float],
+    vector_scores: dict[str, float],
+    *,
+    limit: int,
+) -> list[RetrievalDebugMatch]:
+    matches = [
+        RetrievalDebugMatch(
+            kind="question",
+            id=str(item.id),
+            collection_id=str(item.collection_id),
+            collection_title=getattr(item.collection, "title", ""),
+            title=item.stem,
+            keyword_score=keyword_scores.get(str(item.id), 0.0),
+            vector_score=vector_scores.get(str(item.id), 0.0),
+            total_score=keyword_scores.get(str(item.id), 0.0) + vector_scores.get(str(item.id), 0.0),
+            tags=item.tags_json or [],
+        )
+        for item in items
+        if keyword_scores.get(str(item.id), 0.0) or vector_scores.get(str(item.id), 0.0)
+    ]
+    return sorted(matches, key=lambda value: value.total_score, reverse=True)[:limit]
+
+
+def _debug_chunk_matches(
+    items: list[KnowledgeChunk],
+    keyword_scores: dict[str, float],
+    vector_scores: dict[str, float],
+    *,
+    limit: int,
+) -> list[RetrievalDebugMatch]:
+    matches = [
+        RetrievalDebugMatch(
+            kind="chunk",
+            id=str(chunk.id),
+            collection_id=str(chunk.collection_id),
+            collection_title=getattr(chunk.collection, "title", ""),
+            title=chunk.title,
+            keyword_score=keyword_scores.get(str(chunk.id), 0.0),
+            vector_score=vector_scores.get(str(chunk.id), 0.0),
+            total_score=keyword_scores.get(str(chunk.id), 0.0) + vector_scores.get(str(chunk.id), 0.0),
+            tags=chunk.tags_json or [],
+            source_ref=chunk.source_ref,
+        )
+        for chunk in items
+        if keyword_scores.get(str(chunk.id), 0.0) or vector_scores.get(str(chunk.id), 0.0)
+    ]
+    return sorted(matches, key=lambda value: value.total_score, reverse=True)[:limit]
 
 
 def _score_question_item(item: QuestionBankItem, terms: list[str], query: str) -> int:

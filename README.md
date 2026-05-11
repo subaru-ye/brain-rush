@@ -50,6 +50,7 @@ AUTH_TOKEN_SECRET=change-me-in-production
 ```
 
 当前 RAG 采用 `pgvector` 混合检索：`knowledge_collections` 保存知识领域，
+`knowledge_documents` 预留给后续文件、网页、截图等具体资料来源，
 `knowledge_chunks` 保存可检索知识片段和向量，`question_bank_items` 保存高质量原题和向量。
 导入知识库时会调用 Embedding 模型生成向量；生成题目时会对用户输入生成 query embedding，
 再结合关键词检索与向量检索召回相关内容。命中足够原题时不调用出题 AI，不足时只让 AI 基于检索上下文补齐。
@@ -66,6 +67,14 @@ AUTH_TOKEN_SECRET=change-me-in-production
 ```powershell
 .\backend\scripts\import-curated-rag.ps1 -Path .\backend\data\rag-knowledge.json
 ```
+
+导入后可用调试脚本查看检索命中和分数：
+
+```powershell
+.\backend\scripts\debug-rag.ps1 -Query "RAG 检索效果怎么优化"
+```
+
+输出会包含 `retrievalVersion`、命中的题目和知识片段、`keywordScore`、`vectorScore`、`totalScore`。
 
 填好 `backend\.env` 后启动：
 

@@ -24,6 +24,14 @@ const questionTypeLabels = {
   true_false: "判断题"
 }
 
+const sourceTypeLabels: Record<string, string> = {
+  curated_question: "精选题",
+  rag_generated: "RAG生成",
+  ai_generated: "AI生成"
+}
+
+const showRagDebug = process.env.NODE_ENV !== "production"
+
 export default function QuizPage() {
   const [feedbackStatus, setFeedbackStatus] = useState("")
   const {
@@ -87,6 +95,12 @@ export default function QuizPage() {
 
       <View className='question-card'>
         <View className='question-chip'><Text>{questionTypeLabels[questionType]}</Text></View>
+        {showRagDebug ? (
+          <View className='rag-debug-row'>
+            <Text>{sourceTypeLabels[question.sourceType || ""] || question.sourceType || "未知来源"}</Text>
+            <Text>{question.retrievalVersion || session.retrievalVersion || "no-retrieval"}</Text>
+          </View>
+        ) : null}
         <View className='question-title'><Text>{question.stem}</Text></View>
         <View className='question-tip'>
           <Text>{isMultipleChoice ? "请选择所有正确答案，确认后查看解析。" : "请选择一个你认为最准确的答案。"}</Text>
