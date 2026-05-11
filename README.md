@@ -12,7 +12,7 @@ Brain Rush 是一个 AI 闯关学习微信小程序。用户输入学习主题�
 - 学习闭环：首页输入 -> 生成题目 -> 闯关答题 -> 生成复盘报告 -> 保存历史。
 - 学习沉淀：历史记录、历史详情、错题本复训、题目质量反馈。
 - 数据库：PostgreSQL + Alembic 管理 schema。
-- RAG：`pgvector` 向量检索 + 关键词检索，支持精选题优先返回，不足时基于检索上下文让 AI 补题。
+- RAG：`pgvector` 向量检索 + PostgreSQL FTS 优先的关键词检索，支持精选题优先返回，不足时基于检索上下文让 AI 补题。
 - 可观测性：结构化日志、`X-Request-ID`、RAG 调试脚本。
 
 暂未实现：文件/PDF/网页/截图自动解析入库、知识库后台管理、异步导入任务、Rerank 精排、支付、排行榜、多人 PK。
@@ -87,6 +87,12 @@ $env:PYTHONPATH = "$pwd\backend"
 
 ```powershell
 .\backend\scripts\debug-rag.ps1 -Query "RAG 检索效果怎么优化"
+```
+
+关键词检索优先使用 PostgreSQL Full-Text Search；如果本地 PostgreSQL 已安装 `pg_jieba`，会使用 `jiebacfg` 做中文分词，否则自动降级到 `simple` FTS 和 Python 兜底打分。可尝试安装本机 PostgreSQL 17 的 `pg_jieba`：
+
+```powershell
+.\backend\scripts\install-pg-jieba.ps1 -PostgresHome "C:\Program Files\PostgreSQL\17" -Database brain_rush -AdminUser postgres
 ```
 
 RAG 当前实现说明见 [docs/RAG当前实现说明.md](docs/RAG当前实现说明.md)，后续优化路线见 [docs/RAG后续优化与扩展.md](docs/RAG后续优化与扩展.md)。

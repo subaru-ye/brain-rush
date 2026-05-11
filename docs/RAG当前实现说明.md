@@ -62,7 +62,7 @@ questions: 精选题
 7. 内容变化时调用 OpenAI-compatible embeddings 接口。
 8. 写入 `embedding`、`embedding_model`、`embedding_version`、`content_hash`、`embedded_at`。
 
-如果 embedding 配置缺失，导入仍可写入基础知识数据，但不会生成真实向量；运行时会退回关键词检索。
+如果 embedding 配置缺失，导入仍可写入基础知识数据，但不会生成真实向量；运行时会继续使用关键词检索。
 
 ## Embedding 配置
 
@@ -97,17 +97,27 @@ POST /api/generate-quiz
   -> 生成 query embedding
   -> 检索 question_bank_items
   -> 检索 knowledge_chunks
-  -> 关键词分 + 向量分合并排序
+  -> PostgreSQL FTS 关键词分 + 向量分合并排序
   -> 取前 5 个精选题和前 5 个知识片段
 ```
 
 当前版本：
 
 ```text
-hybrid-rag-v1 = 关键词检索 + pgvector 向量检索
+hybrid-rag-v1.1 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检索
 ```
 
-关键词检索负责精确词命中，例如 `RAG`、`Embedding`、`Rerank`、`pgvector`。向量检索负责语义相似，例如“检索效果怎么优化”可以命中“混合检索”“重排序”“评估指标”等内容。
+关键词检索负责精确词命中，例如 `RAG`、`Embedding`、`Rerank`、`BM25`、`pgvector`、`HNSW`。PostgreSQL 环境会优先使用 Full-Text Search；如果安装了 `pg_jieba`，会使用 `jiebacfg` 做中文分词，否则使用 `simple` FTS，并保留 Python 字段加权 scorer 兜底。向量检索负责语义相似，例如“检索效果怎么优化”可以命中“混合检索”“重排序”“评估指标”等内容。
+
+关键词分会按字段拆分加权：
+
+| 字段组 | 当前作用 |
+| --- | --- |
+| `title` | chunk 标题、题干、知识点，权重最高。 |
+| `tags` | chunk/question tags，权重较高。 |
+| `body` | chunk 正文、题目解释、选项等主体内容。 |
+| `source` | chunk 的 `sourceRef`，用于低权重来源命中。 |
+| `collection` | collection 标题、描述和 tags，作为领域辅助信号。 |
 
 ## 出题策略
 
@@ -131,7 +141,7 @@ hybrid-rag-v1 = 关键词检索 + pgvector 向量检索
 | `sourceType=rag_generated` | 题目由 AI 基于 RAG 检索上下文生成。 |
 | `sourceType=ai_generated` | 未命中 RAG，上游 AI 普通生成。 |
 | `sourceIds` | 命中的题目或知识片段 id，最多保留 10 个。 |
-| `retrievalVersion` | 当前检索版本，例如 `hybrid-rag-v1`。 |
+| `retrievalVersion` | 当前检索版本，例如 `hybrid-rag-v1.1`。 |
 
 会话级字段：
 
@@ -155,6 +165,7 @@ hybrid-rag-v1 = 关键词检索 + pgvector 向量检索
 - 命中的 questions
 - 命中的 chunks
 - `keywordScore`
+- `keywordScoreBreakdown`
 - `vectorScore`
 - `totalScore`
 - `tags`
@@ -162,16 +173,16 @@ hybrid-rag-v1 = 关键词检索 + pgvector 向量检索
 
 判断方式：
 
-- 返回 `hybrid-rag-v1`：说明本次使用了向量检索结果。
-- 返回 `curated-rag-v1`：说明只走了关键词检索。
+- 返回 `hybrid-rag-v1.1`：说明本次使用了当前 RAG 检索链路。
 - questions 命中较多：可能直接返回精选题，减少 AI 出题调用。
 - chunks 命中较多：AI 补题时会获得更具体的上下文。
 - `vectorScore` 为 0：可能没有配置 embedding，或相关数据没有向量。
+- `keywordScoreBreakdown` 可用于判断命中主要来自标题、tags、正文、来源还是 collection 元数据。
 
 ## 当前限制
 
 - `knowledge_documents` 已建表，但 JSON 导入还没有真正创建 document 并把 chunk 挂到 `document_id`。
-- 关键词检索仍是轻量实现，不是 BM25 或 PostgreSQL full-text search。
+- 关键词检索已接入 PostgreSQL Full-Text Search，但中文分词依赖数据库是否安装 `pg_jieba`；未安装时会自动降级到 `simple` FTS 和 Python 兜底打分。
 - 混合排序当前是关键词分和向量分直接合并，尚未使用 RRF。
 - 暂未接入 Rerank；当前数据规模下暂不值得增加复杂度。
 - 暂未实现知识库后台管理、文档上传解析、异步导入任务和检索评估集。

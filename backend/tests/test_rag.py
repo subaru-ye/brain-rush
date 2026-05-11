@@ -72,6 +72,12 @@ class FakeEmbeddingClient:
         return [make_vector(index) for index, _ in enumerate(texts)]
 
 
+class DisabledEmbeddingClient:
+    is_enabled = False
+    model_name = ""
+    version = ""
+
+
 def make_vector(index: int) -> list[float]:
     values = [0.0] * 1536
     values[index] = 1.0
@@ -135,7 +141,7 @@ def test_generate_quiz_returns_curated_questions_without_ai_call():
 
     assert ai_client.quiz_calls == []
     assert len(response.questions) == 5
-    assert response.retrievalVersion == "curated-rag-v1"
+    assert response.retrievalVersion == "hybrid-rag-v1.1"
     assert {question.sourceType for question in response.questions} == {"curated_question"}
     assert response.questions[0].id == "q1"
     assert response.questions[0].answerIndexes == [0]
@@ -273,7 +279,7 @@ def test_hybrid_retrieval_uses_vector_matches_without_keyword_overlap():
         embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
     )
 
-    assert context.retrieval_version == "hybrid-rag-v1"
+    assert context.retrieval_version == "hybrid-rag-v1.1"
     assert [item.stem for item in context.question_items] == ["Completely different stem"]
 
 
@@ -315,12 +321,74 @@ def test_debug_retrieval_reports_keyword_and_vector_scores():
         embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
     )
 
-    assert result.retrieval_version == "hybrid-rag-v1"
+    assert result.retrieval_version == "hybrid-rag-v1.1"
     assert result.questions[0].title == "RAG debug question"
     assert result.questions[0].keyword_score > 0
     assert result.questions[0].vector_score > 0
+    assert sum(result.questions[0].keyword_score_breakdown.values()) == result.questions[0].keyword_score
     assert result.chunks[0].title == "RAG debug chunk"
     assert result.chunks[0].source_ref == "manual"
+    assert result.chunks[0].keyword_score_breakdown["title"] > 0
+
+
+def test_keyword_retrieval_weights_title_and_tags_above_body_only_matches():
+    db = build_db()
+    collection = KnowledgeCollection(title="Keyword RAG", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    db.add_all(
+        [
+            KnowledgeChunk(
+                collection_id=collection.id,
+                title="BM25 scoring",
+                content="Search ranking overview.",
+                source_ref="manual",
+                tags_json=["ranking"],
+            ),
+            KnowledgeChunk(
+                collection_id=collection.id,
+                title="Search overview",
+                content="BM25 can be used for keyword ranking.",
+                source_ref="manual",
+                tags_json=[],
+            ),
+        ]
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "BM25",
+        embedding_client=DisabledEmbeddingClient(),
+    )
+
+    assert context.retrieval_version == "hybrid-rag-v1.1"
+    assert [chunk.title for chunk in context.chunks[:2]] == ["BM25 scoring", "Search overview"]
+
+
+def test_keyword_retrieval_matches_technical_terms():
+    db = build_db()
+    collection = KnowledgeCollection(title="Technical RAG", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    db.add(
+        KnowledgeChunk(
+            collection_id=collection.id,
+            title="pgvector HNSW settings",
+            content="RAG systems can combine BM25 and pgvector HNSW indexes.",
+            source_ref="manual",
+            tags_json=["RAG", "BM25", "pgvector", "HNSW"],
+        )
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "RAG BM25 pgvector HNSW",
+        embedding_client=DisabledEmbeddingClient(),
+    )
+
+    assert [chunk.title for chunk in context.chunks] == ["pgvector HNSW settings"]
 
 
 def test_retrieval_ignores_inactive_collections():
