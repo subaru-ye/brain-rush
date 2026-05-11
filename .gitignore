@@ -8,4 +8,5 @@ dist/
 .swc/
 .env
 project.private.config.json
+docs/Learning.md
 docs/optimize.md
