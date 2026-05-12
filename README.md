@@ -15,7 +15,7 @@ Brain Rush 是一个 AI 闯关学习微信小程序。用户输入学习主题�
 - RAG：PostgreSQL FTS 优先的关键词检索 + `pgvector` 向量检索，并通过 RRF 融合排序，支持精选题优先返回，不足时基于检索上下文让 AI 补题。
 - 可观测性：结构化日志、`X-Request-ID`、RAG 调试脚本。
 
-暂未实现：文件/PDF/网页/截图自动解析入库、知识库后台管理、异步导入任务、Rerank 精排、支付、排行榜、多人 PK。
+暂未实现：Word/网页/截图 OCR 自动解析入库、知识库后台管理、异步导入任务、Rerank 精排、支付、排行榜、多人 PK。
 
 ## 技术栈
 
@@ -81,6 +81,12 @@ $env:PYTHONPATH = "$pwd\backend"
 
 ```powershell
 .\backend\scripts\import-curated-rag.ps1 -Path .\backend\data\rag-knowledge.json
+```
+
+导入本地资料文件到指定知识库，当前支持 `.txt`、`.md` 和文本型 `.pdf`：
+
+```powershell
+.\backend\scripts\import-document-rag.ps1 -Path .\docs\rag-notes.md -Collection "RAG 知识库"
 ```
 
 查看一次查询命中了哪些题目和知识片段：

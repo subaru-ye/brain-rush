@@ -158,14 +158,21 @@
 - 说明：`hybrid-rag-v1.2` 优先使用 PostgreSQL Full-Text Search；本机可通过 `install-pg-jieba.ps1` 尝试安装 `pg_jieba` 并启用 `jiebacfg` 中文分词，不可用时降级到 `simple` FTS 和 Python 字段加权 scorer。
 - 价值：提升标题、tags、正文和专有术语命中的可控性，同时通过 `keywordScoreBreakdown` 让关键词排序更可调试。
 
+### 22. 本地文件资料导入 Pipeline 最小版
+
+- 所属端：数据/RAG
+- 状态：已完成
+- 说明：新增本地 `.txt`、`.md` 和文本型 `.pdf` 导入 Pipeline，自动提取文本、清洗、切 chunk，并复用 curated 导入流程写入 document/chunks 和 embedding 元数据。
+- 价值：知识库维护不再只能手写 JSON，后续可在同一结构上扩展 URL、Word、OCR 和异步任务。
+
 ## 待实现优化
 
-### 1. 资料处理 Pipeline
+### 1. 资料处理 Pipeline 扩展
 
 - 所属端：数据/RAG
 - 状态：待实现
-- 说明：支持 PDF、Word、网页、截图资料的文本提取、清洗、切片、tags 生成、embedding 和入库。
-- 价值：知识库建设从手写 JSON 过渡到可扩展资料导入系统。
+- 说明：在本地文件最小版基础上，继续支持 URL、Word、截图 OCR、自动 tags、导入任务状态和失败重试。
+- 价值：知识库建设从本地脚本升级到可维护、可追踪的资料导入系统。
 
 ### 2. 检索评估集
 

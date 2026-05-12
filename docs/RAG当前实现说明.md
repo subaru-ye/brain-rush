@@ -51,6 +51,14 @@ questions: 精选题
 .\backend\scripts\import-curated-rag.ps1 -Path .\backend\data\rag-knowledge.json
 ```
 
+也可以用本地文件导入 Pipeline 把 `.txt`、`.md` 或文本型 `.pdf` 转为 document + chunks 后入库：
+
+```powershell
+.\backend\scripts\import-document-rag.ps1 -Path .\docs\rag-notes.md -Collection "RAG 知识库"
+```
+
+该 Pipeline 会提取文本、清洗空白、按段落优先切 chunk，并复用 curated 导入流程写入 `knowledge_documents` 和 `knowledge_chunks`。扫描版 PDF、Word、网页、截图 OCR 和异步导入任务仍属于后续扩展。
+
 导入时会执行：
 
 1. 读取 JSON 中的 collections。
@@ -188,7 +196,7 @@ hybrid-rag-v1.2 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检�
 
 ## 当前限制
 
-- curated JSON 已支持 document 层级，但暂未实现 PDF/Word/网页/截图的自动解析 Pipeline。
+- 已支持本地 `.txt`、`.md` 和文本型 `.pdf` 的最小导入 Pipeline；暂未支持 Word、网页、截图 OCR 和异步导入任务。
 - 关键词检索已接入 PostgreSQL Full-Text Search，但中文分词依赖数据库是否安装 `pg_jieba`；未安装时会自动降级到 `simple` FTS 和 Python 兜底打分。
 - 混合排序当前使用 RRF 融合关键词结果和向量结果，避免不同检索器的原始分数尺度互相压制。
 - 暂未接入 Rerank；当前数据规模下暂不值得增加复杂度。
