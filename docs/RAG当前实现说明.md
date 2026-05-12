@@ -104,7 +104,7 @@ POST /api/generate-quiz
 当前版本：
 
 ```text
-hybrid-rag-v1.1 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检索
+hybrid-rag-v1.2 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检索 + RRF 融合排序
 ```
 
 关键词检索负责精确词命中，例如 `RAG`、`Embedding`、`Rerank`、`BM25`、`pgvector`、`HNSW`。PostgreSQL 环境会优先使用 Full-Text Search；如果安装了 `pg_jieba`，会使用 `jiebacfg` 做中文分词，否则使用 `simple` FTS，并保留 Python 字段加权 scorer 兜底。向量检索负责语义相似，例如“检索效果怎么优化”可以命中“混合检索”“重排序”“评估指标”等内容。
@@ -141,7 +141,7 @@ hybrid-rag-v1.1 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检�
 | `sourceType=rag_generated` | 题目由 AI 基于 RAG 检索上下文生成。 |
 | `sourceType=ai_generated` | 未命中 RAG，上游 AI 普通生成。 |
 | `sourceIds` | 命中的题目或知识片段 id，最多保留 10 个。 |
-| `retrievalVersion` | 当前检索版本，例如 `hybrid-rag-v1.1`。 |
+| `retrievalVersion` | 当前检索版本，例如 `hybrid-rag-v1.2`。 |
 
 会话级字段：
 
@@ -168,22 +168,27 @@ hybrid-rag-v1.1 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检�
 - `keywordScoreBreakdown`
 - `vectorScore`
 - `totalScore`
+- `keywordRank`
+- `vectorRank`
+- `fusionMethod`
 - `tags`
 - `sourceRef`
 
 判断方式：
 
-- 返回 `hybrid-rag-v1.1`：说明本次使用了当前 RAG 检索链路。
+- 返回 `hybrid-rag-v1.2`：说明本次使用了当前 RAG 检索链路。
 - questions 命中较多：可能直接返回精选题，减少 AI 出题调用。
 - chunks 命中较多：AI 补题时会获得更具体的上下文。
 - `vectorScore` 为 0：可能没有配置 embedding，或相关数据没有向量。
 - `keywordScoreBreakdown` 可用于判断命中主要来自标题、tags、正文、来源还是 collection 元数据。
+- `totalScore` 在 `hybrid-rag-v1.2` 中表示 RRF 融合分，不再是关键词分和向量分的直接相加。
+- `keywordRank`、`vectorRank` 和 `fusionMethod` 可用于判断排序是否来自关键词、向量或两路共同命中。
 
 ## 当前限制
 
 - `knowledge_documents` 已建表，但 JSON 导入还没有真正创建 document 并把 chunk 挂到 `document_id`。
 - 关键词检索已接入 PostgreSQL Full-Text Search，但中文分词依赖数据库是否安装 `pg_jieba`；未安装时会自动降级到 `simple` FTS 和 Python 兜底打分。
-- 混合排序当前是关键词分和向量分直接合并，尚未使用 RRF。
+- 混合排序当前使用 RRF 融合关键词结果和向量结果，避免不同检索器的原始分数尺度互相压制。
 - 暂未接入 Rerank；当前数据规模下暂不值得增加复杂度。
 - 暂未实现知识库后台管理、文档上传解析、异步导入任务和检索评估集。
 - 运行时 AI 生成题不会自动进入精选题库，避免低质量生成结果污染 `question_bank_items`。

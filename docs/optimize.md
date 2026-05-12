@@ -123,18 +123,18 @@
 - 说明：curated JSON 导入时会为 chunk/question 生成 embedding；内容、模型和版本未变化时跳过重复 embedding。
 - 价值：避免重复消耗 embedding 额度，保证知识库数据和向量元数据一致。
 
-### 17. hybrid-rag-v1.1 检索链路
+### 17. hybrid-rag-v1.2 检索链路
 
 - 所属端：数据/RAG
 - 状态：已完成
-- 说明：生成题目时先执行 PostgreSQL FTS 优先的关键词检索 + 向量检索，精选题优先返回，不足时把检索上下文交给 AI 补题。
+- 说明：生成题目时先执行 PostgreSQL FTS 优先的关键词检索 + 向量检索，并用 RRF 融合排序；精选题优先返回，不足时把检索上下文交给 AI 补题。
 - 价值：降低纯 AI 出题的不稳定性，让自维护题库和知识库真正参与出题。
 
 ### 18. RAG 检索可观测性
 
 - 所属端：数据/RAG
 - 状态：已完成
-- 说明：新增 `debug-rag.ps1`，可查看一次 query 命中的 questions/chunks、关键词分、关键词字段分数拆解、向量分、总分和 `retrievalVersion`；前端开发环境展示题目来源。
+- 说明：新增 `debug-rag.ps1`，可查看一次 query 命中的 questions/chunks、关键词分、关键词字段分数拆解、向量分、RRF 融合分、rank 和 `retrievalVersion`；前端开发环境展示题目来源。
 - 价值：RAG 不再是黑盒，可以直接判断是否命中、命中了什么、排序是否合理。
 
 ### 19. `knowledge_documents` 资料来源模型预留
@@ -155,7 +155,7 @@
 
 - 所属端：数据/RAG
 - 状态：已完成
-- 说明：`hybrid-rag-v1.1` 优先使用 PostgreSQL Full-Text Search；本机可通过 `install-pg-jieba.ps1` 尝试安装 `pg_jieba` 并启用 `jiebacfg` 中文分词，不可用时降级到 `simple` FTS 和 Python 字段加权 scorer。
+- 说明：`hybrid-rag-v1.2` 优先使用 PostgreSQL Full-Text Search；本机可通过 `install-pg-jieba.ps1` 尝试安装 `pg_jieba` 并启用 `jiebacfg` 中文分词，不可用时降级到 `simple` FTS 和 Python 字段加权 scorer。
 - 价值：提升标题、tags、正文和专有术语命中的可控性，同时通过 `keywordScoreBreakdown` 让关键词排序更可调试。
 
 ## 待实现优化
@@ -188,11 +188,11 @@
 - 说明：当前已接入 PostgreSQL FTS；后续可继续用检索评估集校准字段权重，或在数据规模扩大后评估 BM25。
 - 价值：提升专有名词、数字、英文缩写和精确概念的召回稳定性。
 
-### 5. 混合排序策略优化
+### 5. 混合排序策略继续校准
 
 - 所属端：数据/RAG
-- 状态：待实现
-- 说明：当前是关键词分 + 向量分直接合并；后续可考虑 RRF、字段权重和分数归一化。
+- 状态：已完成基础版
+- 说明：当前已使用 RRF 融合关键词结果和向量结果；后续可结合评估集继续校准 RRF 参数、字段权重和分数归一化方案。
 - 价值：降低不同检索器分数尺度不一致造成的排序偏差。
 
 ### 6. 知识库后台管理

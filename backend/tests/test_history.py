@@ -94,7 +94,7 @@ def history_payload(session_id: str = "session-1", include_versions: bool = Fals
                 "quizModelName": "quiz-model-test",
                 "reportPromptVersion": "report-exp-v2",
                 "reportModelName": "report-model-test",
-                "retrievalVersion": "hybrid-rag-v1.1",
+                "retrievalVersion": "hybrid-rag-v1.2",
             }
         )
     return payload
@@ -150,7 +150,7 @@ def test_create_list_and_get_history_record(history_client):
     assert record["quizModelName"] == "quiz-model-test"
     assert record["reportPromptVersion"] == "report-exp-v2"
     assert record["reportModelName"] == "report-model-test"
-    assert record["retrievalVersion"] == "hybrid-rag-v1.1"
+    assert record["retrievalVersion"] == "hybrid-rag-v1.2"
 
     list_response = history_client.get("/api/history", headers=headers)
     assert list_response.status_code == 200
@@ -160,7 +160,7 @@ def test_create_list_and_get_history_record(history_client):
     assert detail_response.status_code == 200
     assert detail_response.json()["questions"][1]["knowledgePoint"] == "Point 2"
     assert detail_response.json()["quizPromptVersion"] == "quiz-exp-v2"
-    assert detail_response.json()["retrievalVersion"] == "hybrid-rag-v1.1"
+    assert detail_response.json()["retrievalVersion"] == "hybrid-rag-v1.2"
 
 
 def test_history_save_uses_current_versions_for_legacy_payload(history_client):

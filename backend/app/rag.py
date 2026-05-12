@@ -16,10 +16,14 @@ from .quiz_answers import format_option_indexes
 from .schemas import QuizQuestion
 
 
-KEYWORD_RETRIEVAL_VERSION = "hybrid-rag-v1.1"
-RETRIEVAL_VERSION = "hybrid-rag-v1.1"
+KEYWORD_RETRIEVAL_VERSION = "hybrid-rag-v1.2"
+RETRIEVAL_VERSION = "hybrid-rag-v1.2"
 VECTOR_CANDIDATE_LIMIT = 20
 KEYWORD_CANDIDATE_LIMIT = 20
+FUSION_METHOD = "rrf"
+RRF_K = 60
+RRF_KEYWORD_WEIGHT = 1.0
+RRF_VECTOR_WEIGHT = 1.0
 KEYWORD_DEBUG_KEYS = ("title", "tags", "body", "source", "collection")
 PYTHON_FIELD_WEIGHTS = {
     "title": 18.0,
@@ -91,6 +95,9 @@ class RetrievalDebugMatch:
     tags: list[str]
     source_ref: str = ""
     keyword_score_breakdown: dict[str, float] = field(default_factory=dict)
+    keyword_rank: int | None = None
+    vector_rank: int | None = None
+    fusion_method: str = FUSION_METHOD
 
     def to_dict(self) -> dict:
         return {
@@ -102,6 +109,9 @@ class RetrievalDebugMatch:
             "keywordScore": round(self.keyword_score, 4),
             "vectorScore": round(self.vector_score, 4),
             "totalScore": round(self.total_score, 4),
+            "keywordRank": self.keyword_rank,
+            "vectorRank": self.vector_rank,
+            "fusionMethod": self.fusion_method,
             "keywordScoreBreakdown": {
                 key: round(self.keyword_score_breakdown.get(key, 0.0), 4)
                 for key in KEYWORD_DEBUG_KEYS
@@ -170,11 +180,11 @@ def retrieve_curated_context_with_client(
             vector_questions = []
             vector_chunks = []
         if vector_questions or vector_chunks:
-            scored_questions = _merge_scores(
+            scored_questions = _merge_scores_rrf(
                 scored_questions[:KEYWORD_CANDIDATE_LIMIT],
                 vector_questions,
             )
-            scored_chunks = _merge_scores(
+            scored_chunks = _merge_scores_rrf(
                 scored_chunks[:KEYWORD_CANDIDATE_LIMIT],
                 vector_chunks,
             )
@@ -217,24 +227,39 @@ def debug_retrieve_curated_context(
     }
     question_vector_scores: dict[str, float] = {}
     chunk_vector_scores: dict[str, float] = {}
+    question_vector_matches: list[tuple[float, QuestionBankItem]] = []
+    chunk_vector_matches: list[tuple[float, KnowledgeChunk]] = []
     retrieval_version = KEYWORD_RETRIEVAL_VERSION
 
     if embedding_client.is_enabled:
         try:
             query_embedding = embedding_client.embed_query(query)
+            question_vector_matches = _vector_question_scores(db, question_items, query_embedding)
+            chunk_vector_matches = _vector_chunk_scores(db, chunks, query_embedding)
             question_vector_scores = {
                 str(item.id): float(score)
-                for score, item in _vector_question_scores(db, question_items, query_embedding)
+                for score, item in question_vector_matches
             }
             chunk_vector_scores = {
                 str(chunk.id): float(score)
-                for score, chunk in _vector_chunk_scores(db, chunks, query_embedding)
+                for score, chunk in chunk_vector_matches
             }
         except Exception:
             question_vector_scores = {}
             chunk_vector_scores = {}
+            question_vector_matches = []
+            chunk_vector_matches = []
         if question_vector_scores or chunk_vector_scores:
             retrieval_version = RETRIEVAL_VERSION
+
+    question_keyword_ranks = _score_rank_lookup(
+        [(match.score, match.item) for match in question_keyword_matches[:KEYWORD_CANDIDATE_LIMIT]]
+    )
+    chunk_keyword_ranks = _score_rank_lookup(
+        [(match.score, match.item) for match in chunk_keyword_matches[:KEYWORD_CANDIDATE_LIMIT]]
+    )
+    question_vector_ranks = _score_rank_lookup(question_vector_matches)
+    chunk_vector_ranks = _score_rank_lookup(chunk_vector_matches)
 
     return RetrievalDebugResult(
         query=query,
@@ -244,6 +269,8 @@ def debug_retrieve_curated_context(
             question_keyword_scores,
             question_vector_scores,
             question_keyword_breakdowns,
+            question_keyword_ranks,
+            question_vector_ranks,
             limit=limit,
         ),
         chunks=_debug_chunk_matches(
@@ -251,6 +278,8 @@ def debug_retrieve_curated_context(
             chunk_keyword_scores,
             chunk_vector_scores,
             chunk_keyword_breakdowns,
+            chunk_keyword_ranks,
+            chunk_vector_ranks,
             limit=limit,
         ),
     )
@@ -625,14 +654,33 @@ def _cosine_similarity(left: Iterable[float], right: Iterable[float]) -> float:
     return numerator / (left_norm * right_norm)
 
 
-def _merge_scores(primary, secondary):
-    merged: dict[str, tuple[float, object]] = {}
-    for score, item in primary:
-        merged[str(item.id)] = (float(score), item)
-    for score, item in secondary:
-        existing_score, _ = merged.get(str(item.id), (0.0, item))
-        merged[str(item.id)] = (existing_score + float(score), item)
-    return sorted(merged.values(), key=lambda value: value[0], reverse=True)
+def _merge_scores_rrf(primary, secondary):
+    keyword_ranks = _score_rank_lookup(primary)
+    vector_ranks = _score_rank_lookup(secondary)
+    items: dict[str, object] = {}
+    for _, item in primary:
+        items[str(item.id)] = item
+    for _, item in secondary:
+        items[str(item.id)] = item
+    merged = [
+        (_rrf_score(keyword_ranks.get(item_id), vector_ranks.get(item_id)), item)
+        for item_id, item in items.items()
+    ]
+    return sorted(merged, key=lambda value: value[0], reverse=True)
+
+
+def _score_rank_lookup(scored) -> dict[str, int]:
+    ordered = sorted(scored, key=lambda value: value[0], reverse=True)
+    return {str(item.id): rank for rank, (_, item) in enumerate(ordered, start=1)}
+
+
+def _rrf_score(keyword_rank: int | None, vector_rank: int | None) -> float:
+    score = 0.0
+    if keyword_rank is not None:
+        score += RRF_KEYWORD_WEIGHT / (RRF_K + keyword_rank)
+    if vector_rank is not None:
+        score += RRF_VECTOR_WEIGHT / (RRF_K + vector_rank)
+    return score
 
 
 def _debug_question_matches(
@@ -640,6 +688,8 @@ def _debug_question_matches(
     keyword_scores: dict[str, float],
     vector_scores: dict[str, float],
     keyword_breakdowns: dict[str, dict[str, float]],
+    keyword_ranks: dict[str, int],
+    vector_ranks: dict[str, int],
     *,
     limit: int,
 ) -> list[RetrievalDebugMatch]:
@@ -652,9 +702,11 @@ def _debug_question_matches(
             title=item.stem,
             keyword_score=keyword_scores.get(str(item.id), 0.0),
             vector_score=vector_scores.get(str(item.id), 0.0),
-            total_score=keyword_scores.get(str(item.id), 0.0) + vector_scores.get(str(item.id), 0.0),
+            total_score=_rrf_score(keyword_ranks.get(str(item.id)), vector_ranks.get(str(item.id))),
             tags=item.tags_json or [],
             keyword_score_breakdown=keyword_breakdowns.get(str(item.id), _empty_keyword_breakdown()),
+            keyword_rank=keyword_ranks.get(str(item.id)),
+            vector_rank=vector_ranks.get(str(item.id)),
         )
         for item in items
         if keyword_scores.get(str(item.id), 0.0) or vector_scores.get(str(item.id), 0.0)
@@ -667,6 +719,8 @@ def _debug_chunk_matches(
     keyword_scores: dict[str, float],
     vector_scores: dict[str, float],
     keyword_breakdowns: dict[str, dict[str, float]],
+    keyword_ranks: dict[str, int],
+    vector_ranks: dict[str, int],
     *,
     limit: int,
 ) -> list[RetrievalDebugMatch]:
@@ -679,10 +733,12 @@ def _debug_chunk_matches(
             title=chunk.title,
             keyword_score=keyword_scores.get(str(chunk.id), 0.0),
             vector_score=vector_scores.get(str(chunk.id), 0.0),
-            total_score=keyword_scores.get(str(chunk.id), 0.0) + vector_scores.get(str(chunk.id), 0.0),
+            total_score=_rrf_score(keyword_ranks.get(str(chunk.id)), vector_ranks.get(str(chunk.id))),
             tags=chunk.tags_json or [],
             source_ref=chunk.source_ref,
             keyword_score_breakdown=keyword_breakdowns.get(str(chunk.id), _empty_keyword_breakdown()),
+            keyword_rank=keyword_ranks.get(str(chunk.id)),
+            vector_rank=vector_ranks.get(str(chunk.id)),
         )
         for chunk in items
         if keyword_scores.get(str(chunk.id), 0.0) or vector_scores.get(str(chunk.id), 0.0)

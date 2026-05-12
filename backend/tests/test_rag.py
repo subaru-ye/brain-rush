@@ -141,7 +141,7 @@ def test_generate_quiz_returns_curated_questions_without_ai_call():
 
     assert ai_client.quiz_calls == []
     assert len(response.questions) == 5
-    assert response.retrievalVersion == "hybrid-rag-v1.1"
+    assert response.retrievalVersion == "hybrid-rag-v1.2"
     assert {question.sourceType for question in response.questions} == {"curated_question"}
     assert response.questions[0].id == "q1"
     assert response.questions[0].answerIndexes == [0]
@@ -279,8 +279,44 @@ def test_hybrid_retrieval_uses_vector_matches_without_keyword_overlap():
         embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
     )
 
-    assert context.retrieval_version == "hybrid-rag-v1.1"
+    assert context.retrieval_version == "hybrid-rag-v1.2"
     assert [item.stem for item in context.question_items] == ["Completely different stem"]
+
+
+def test_rrf_fusion_promotes_results_ranked_by_both_keyword_and_vector():
+    db = build_db()
+    collection = KnowledgeCollection(title="RRF ranking", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    db.add_all(
+        [
+            KnowledgeChunk(
+                collection_id=collection.id,
+                title="target target target",
+                content="Keyword-only chunk with a much stronger raw keyword score.",
+                source_ref="manual",
+                tags_json=["target"],
+            ),
+            KnowledgeChunk(
+                collection_id=collection.id,
+                title="Semantic target",
+                content="target",
+                source_ref="manual",
+                tags_json=[],
+                embedding=make_vector(0),
+            ),
+        ]
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "target",
+        embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
+    )
+
+    assert context.retrieval_version == "hybrid-rag-v1.2"
+    assert [chunk.title for chunk in context.chunks[:2]] == ["Semantic target", "target target target"]
 
 
 def test_debug_retrieval_reports_keyword_and_vector_scores():
@@ -321,11 +357,19 @@ def test_debug_retrieval_reports_keyword_and_vector_scores():
         embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
     )
 
-    assert result.retrieval_version == "hybrid-rag-v1.1"
+    assert result.retrieval_version == "hybrid-rag-v1.2"
     assert result.questions[0].title == "RAG debug question"
     assert result.questions[0].keyword_score > 0
     assert result.questions[0].vector_score > 0
+    assert result.questions[0].keyword_rank == 1
+    assert result.questions[0].vector_rank == 1
+    assert result.questions[0].fusion_method == "rrf"
+    assert abs(result.questions[0].total_score - (1 / 61 + 1 / 61)) < 0.000001
+    assert result.questions[0].total_score != result.questions[0].keyword_score + result.questions[0].vector_score
     assert sum(result.questions[0].keyword_score_breakdown.values()) == result.questions[0].keyword_score
+    assert result.questions[0].to_dict()["fusionMethod"] == "rrf"
+    assert result.questions[0].to_dict()["keywordRank"] == 1
+    assert result.questions[0].to_dict()["vectorRank"] == 1
     assert result.chunks[0].title == "RAG debug chunk"
     assert result.chunks[0].source_ref == "manual"
     assert result.chunks[0].keyword_score_breakdown["title"] > 0
@@ -362,7 +406,7 @@ def test_keyword_retrieval_weights_title_and_tags_above_body_only_matches():
         embedding_client=DisabledEmbeddingClient(),
     )
 
-    assert context.retrieval_version == "hybrid-rag-v1.1"
+    assert context.retrieval_version == "hybrid-rag-v1.2"
     assert [chunk.title for chunk in context.chunks[:2]] == ["BM25 scoring", "Search overview"]
 
 
