@@ -69,10 +69,14 @@ def content_hash(text: str) -> str:
 
 
 def chunk_embedding_text(chunk: Any) -> str:
+    document = getattr(chunk, "document", None)
     return "\n".join(
         [
             f"Collection: {getattr(getattr(chunk, 'collection', None), 'title', '')}",
             f"Collection description: {getattr(getattr(chunk, 'collection', None), 'description', '')}",
+            f"Document: {getattr(document, 'title', '')}",
+            f"Document source type: {getattr(document, 'source_type', '')}",
+            f"Document source URI: {getattr(document, 'source_uri', '')}",
             f"Title: {chunk.title}",
             f"Content: {chunk.content}",
             f"Source: {chunk.source_ref}",

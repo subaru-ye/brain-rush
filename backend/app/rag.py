@@ -5,13 +5,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from math import sqrt
 
-from sqlalchemy import text
+from sqlalchemy import and_, or_, text
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .embeddings import EmbeddingClient
-from .models import KnowledgeChunk, KnowledgeCollection, QuestionBankItem
+from .models import KnowledgeChunk, KnowledgeCollection, KnowledgeDocument, QuestionBankItem
 from .quiz_answers import format_option_indexes
 from .schemas import QuizQuestion
 
@@ -420,12 +420,24 @@ def _active_chunks(db: Session, *, limit: int) -> list[KnowledgeChunk]:
     return db.scalars(
         select(KnowledgeChunk)
         .join(KnowledgeChunk.collection)
+        .outerjoin(KnowledgeChunk.document)
         .where(
             KnowledgeChunk.is_active.is_(True),
             KnowledgeCollection.is_active.is_(True),
+            _active_document_filter(),
         )
         .limit(limit)
     ).all()
+
+
+def _active_document_filter():
+    return or_(
+        KnowledgeChunk.document_id.is_(None),
+        and_(
+            KnowledgeDocument.is_active.is_(True),
+            KnowledgeDocument.status == "active",
+        ),
+    )
 
 
 def _postgres_keyword_question_matches(
@@ -494,9 +506,11 @@ def _postgres_keyword_chunk_matches(
                 ts_rank_cd(to_tsvector(cast(:config_name as regconfig), concat_ws(' ', c.title, c.description, c.tags_json::text)), sq.query_value) as collection_rank
             from knowledge_chunks k
             join knowledge_collections c on c.id = k.collection_id
+            left join knowledge_documents d on d.id = k.document_id
             cross join search_query sq
             where k.is_active is true
               and c.is_active is true
+              and (k.document_id is null or (d.is_active is true and d.status = 'active'))
               and (
                 (
                   setweight(to_tsvector(cast(:config_name as regconfig), coalesce(k.title, '')), 'A') ||
@@ -608,10 +622,12 @@ def _vector_chunk_scores(
         rows = db.execute(
             select(KnowledgeChunk, distance)
             .join(KnowledgeChunk.collection)
+            .outerjoin(KnowledgeChunk.document)
             .where(
                 KnowledgeChunk.is_active.is_(True),
                 KnowledgeChunk.embedding.is_not(None),
                 KnowledgeCollection.is_active.is_(True),
+                _active_document_filter(),
             )
             .order_by(distance)
             .limit(VECTOR_CANDIDATE_LIMIT)

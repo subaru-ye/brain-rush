@@ -22,7 +22,7 @@
 | 表 | 当前职责 |
 | --- | --- |
 | `knowledge_collections` | 知识领域，例如 `RAG 知识库`。不要把每批资料都建成 collection。 |
-| `knowledge_documents` | 具体资料来源，例如 PDF、网页、Word、截图整理材料。当前已建表，但 JSON 导入尚未真正挂载 document 层级。 |
+| `knowledge_documents` | 具体资料来源，例如 PDF、网页、Word、截图整理材料。curated JSON 已支持 document 层级，chunk 可通过 `document_id` 挂载到具体资料来源。 |
 | `knowledge_chunks` | 可检索知识片段，保存正文、tags、来源引用和 embedding。 |
 | `question_bank_items` | 自维护精选题库，保存题干、选项、答案、解析、知识点、tags 和 embedding。 |
 
@@ -55,12 +55,14 @@ questions: 精选题
 
 1. 读取 JSON 中的 collections。
 2. 按 title 和 source type upsert `knowledge_collections`。
-3. upsert `knowledge_chunks` 和 `question_bank_items`。
-4. 为 chunk/question 拼接适合 embedding 的文本。
-5. 计算 `content_hash`。
-6. 内容、模型和 embedding version 未变化时跳过 embedding。
-7. 内容变化时调用 OpenAI-compatible embeddings 接口。
-8. 写入 `embedding`、`embedding_model`、`embedding_version`、`content_hash`、`embedded_at`。
+3. upsert `knowledge_documents`、`knowledge_chunks` 和 `question_bank_items`。
+4. 支持 `collections[].documents[].chunks[]`，document 下的 chunk 会写入 `document_id`。
+5. 旧格式 `collections[].chunks[]` 仍可导入，chunk 的 `document_id` 为空。
+6. 为 chunk/question 拼接适合 embedding 的文本；chunk embedding 文本会包含 collection 和 document 来源信息。
+7. 计算 `content_hash`。
+8. 内容、模型和 embedding version 未变化时跳过 embedding。
+9. 内容变化时调用 OpenAI-compatible embeddings 接口。
+10. 写入 `embedding`、`embedding_model`、`embedding_version`、`content_hash`、`embedded_at`。
 
 如果 embedding 配置缺失，导入仍可写入基础知识数据，但不会生成真实向量；运行时会继续使用关键词检索。
 
@@ -186,7 +188,7 @@ hybrid-rag-v1.2 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检�
 
 ## 当前限制
 
-- `knowledge_documents` 已建表，但 JSON 导入还没有真正创建 document 并把 chunk 挂到 `document_id`。
+- curated JSON 已支持 document 层级，但暂未实现 PDF/Word/网页/截图的自动解析 Pipeline。
 - 关键词检索已接入 PostgreSQL Full-Text Search，但中文分词依赖数据库是否安装 `pg_jieba`；未安装时会自动降级到 `simple` FTS 和 Python 兜底打分。
 - 混合排序当前使用 RRF 融合关键词结果和向量结果，避免不同检索器的原始分数尺度互相压制。
 - 暂未接入 Rerank；当前数据规模下暂不值得增加复杂度。

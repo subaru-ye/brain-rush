@@ -16,7 +16,7 @@ from .embeddings import (
     content_hash,
     question_embedding_text,
 )
-from .models import KnowledgeChunk, KnowledgeCollection, QuestionBankItem
+from .models import KnowledgeChunk, KnowledgeCollection, KnowledgeDocument, QuestionBankItem
 from .models import now_utc
 from .schemas import QuizQuestion
 
@@ -57,6 +57,16 @@ def import_curated_payload_with_stats(
     for item in collections:
         collection = upsert_collection(db, item)
         chunks = upsert_chunks(db, collection, item.get("chunks", []))
+        for document_payload in item.get("documents", []):
+            document = upsert_document(db, collection, document_payload)
+            chunks.extend(
+                upsert_chunks(
+                    db,
+                    collection,
+                    document_payload.get("chunks", []),
+                    document=document,
+                )
+            )
         questions = upsert_questions(db, collection, item.get("questions", []))
         stats.total_imported += len(chunks) + len(questions)
         pending_embeddings.extend(
@@ -104,31 +114,98 @@ def upsert_collection(db: Session, payload: dict[str, Any]) -> KnowledgeCollecti
     return collection
 
 
+def upsert_document(
+    db: Session,
+    collection: KnowledgeCollection,
+    payload: dict[str, Any],
+) -> KnowledgeDocument:
+    title = str(payload["title"]).strip()
+    source_type = str(payload.get("sourceType", "manual")).strip() or "manual"
+    source_uri = str(payload.get("sourceUri", "")).strip()
+    if source_uri:
+        lookup = (
+            KnowledgeDocument.collection_id == collection.id,
+            KnowledgeDocument.source_type == source_type,
+            KnowledgeDocument.source_uri == source_uri,
+        )
+    else:
+        lookup = (
+            KnowledgeDocument.collection_id == collection.id,
+            KnowledgeDocument.source_type == source_type,
+            KnowledgeDocument.title == title,
+        )
+    document = db.scalar(select(KnowledgeDocument).where(*lookup))
+    if not document:
+        document = KnowledgeDocument(
+            collection_id=collection.id,
+            title=title,
+            source_type=source_type,
+            source_uri=source_uri,
+        )
+        db.add(document)
+
+    metadata = payload.get("metadata", {})
+    document.title = title
+    document.source_type = source_type
+    document.source_uri = source_uri
+    document.content_hash = str(payload.get("contentHash", "")).strip() or None
+    document.metadata_json = metadata if isinstance(metadata, dict) else {}
+    document.status = str(payload.get("status", "active")).strip() or "active"
+    document.is_active = bool(payload.get("isActive", True))
+    db.flush()
+    return document
+
+
 def upsert_chunks(
     db: Session,
     collection: KnowledgeCollection,
     chunks: list[dict[str, Any]],
+    *,
+    document: KnowledgeDocument | None = None,
 ) -> list[KnowledgeChunk]:
     items: list[KnowledgeChunk] = []
     for payload in chunks:
         title = str(payload["title"]).strip()
-        chunk = db.scalar(
-            select(KnowledgeChunk).where(
-                KnowledgeChunk.collection_id == collection.id,
-                KnowledgeChunk.title == title,
+        if document:
+            chunk = db.scalar(
+                select(KnowledgeChunk).where(
+                    KnowledgeChunk.collection_id == collection.id,
+                    KnowledgeChunk.document_id == document.id,
+                    KnowledgeChunk.title == title,
+                )
             )
-        )
+            if not chunk:
+                chunk = db.scalar(
+                    select(KnowledgeChunk).where(
+                        KnowledgeChunk.collection_id == collection.id,
+                        KnowledgeChunk.document_id.is_(None),
+                        KnowledgeChunk.title == title,
+                    )
+                )
+        else:
+            chunk = db.scalar(
+                select(KnowledgeChunk).where(
+                    KnowledgeChunk.collection_id == collection.id,
+                    KnowledgeChunk.document_id.is_(None),
+                    KnowledgeChunk.title == title,
+                )
+            )
         if not chunk:
             chunk = KnowledgeChunk(collection_id=collection.id, title=title)
             db.add(chunk)
+        source_ref = str(payload.get("sourceRef", "")).strip()
+        if document and not source_ref:
+            source_ref = document.source_uri or document.title
+        chunk.document_id = document.id if document else None
+        chunk.document = document
+        chunk.title = title
         chunk.content = str(payload["content"]).strip()
-        chunk.source_ref = str(payload.get("sourceRef", "")).strip()
+        chunk.source_ref = source_ref
         chunk.tags_json = normalize_tags(payload.get("tags", []))
         chunk.is_active = bool(payload.get("isActive", True))
         items.append(chunk)
     db.flush()
     return items
-
 
 def upsert_questions(
     db: Session,

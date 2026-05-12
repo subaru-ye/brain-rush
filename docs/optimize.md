@@ -137,12 +137,12 @@
 - 说明：新增 `debug-rag.ps1`，可查看一次 query 命中的 questions/chunks、关键词分、关键词字段分数拆解、向量分、RRF 融合分、rank 和 `retrievalVersion`；前端开发环境展示题目来源。
 - 价值：RAG 不再是黑盒，可以直接判断是否命中、命中了什么、排序是否合理。
 
-### 19. `knowledge_documents` 资料来源模型预留
+### 19. `knowledge_documents` 资料来源模型与基础导入
 
 - 所属端：数据/RAG
 - 状态：已完成
-- 说明：新增 `knowledge_documents` 表，预留 PDF、网页、Word、截图等具体资料来源；`knowledge_chunks` 可通过 `document_id` 关联来源。
-- 价值：为后续资料导入 Pipeline 打基础，避免长期只依赖手写 JSON。
+- 说明：新增 `knowledge_documents` 表，预留 PDF、网页、Word、截图等具体资料来源；curated JSON 支持 document 层级，`knowledge_chunks` 可通过 `document_id` 关联来源。
+- 价值：为后续资料导入 Pipeline 打基础，让每个 chunk 能追踪具体资料来源，同时保持旧 JSON 格式兼容。
 
 ### 20. 文档入口与 RAG 文档拆分
 
@@ -160,42 +160,35 @@
 
 ## 待实现优化
 
-### 1. 让 `knowledge_documents` 真正进入导入流程
-
-- 所属端：数据/RAG
-- 状态：待实现
-- 说明：当前表已存在，但 JSON 导入还没有创建 document，也没有把 chunk 挂到具体 document。
-- 价值：后续才能追踪每个 chunk 来自哪个 PDF、网页或截图。
-
-### 2. 资料处理 Pipeline
+### 1. 资料处理 Pipeline
 
 - 所属端：数据/RAG
 - 状态：待实现
 - 说明：支持 PDF、Word、网页、截图资料的文本提取、清洗、切片、tags 生成、embedding 和入库。
 - 价值：知识库建设从手写 JSON 过渡到可扩展资料导入系统。
 
-### 3. 检索评估集
+### 2. 检索评估集
 
 - 所属端：数据/RAG
 - 状态：待实现
 - 说明：准备固定问题和应命中的 chunk/question，计算 Recall@K、MRR 等指标。
 - 价值：每次改检索策略都能客观判断效果变化。
 
-### 4. 关键词检索继续校准
+### 3. 关键词检索继续校准
 
 - 所属端：数据/RAG
 - 状态：待实现
 - 说明：当前已接入 PostgreSQL FTS；后续可继续用检索评估集校准字段权重，或在数据规模扩大后评估 BM25。
 - 价值：提升专有名词、数字、英文缩写和精确概念的召回稳定性。
 
-### 5. 混合排序策略继续校准
+### 4. 混合排序策略继续校准
 
 - 所属端：数据/RAG
 - 状态：已完成基础版
 - 说明：当前已使用 RRF 融合关键词结果和向量结果；后续可结合评估集继续校准 RRF 参数、字段权重和分数归一化方案。
 - 价值：降低不同检索器分数尺度不一致造成的排序偏差。
 
-### 6. 知识库后台管理
+### 5. 知识库后台管理
 
 - 所属端：前后端协同
 - 状态：待实现

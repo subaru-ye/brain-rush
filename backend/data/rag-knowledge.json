@@ -23,6 +23,29 @@
         "调参"
       ],
       "isActive": true,
+      "documents": [
+        {
+          "title": "RAG 文档导入示例",
+          "sourceType": "manual",
+          "sourceUri": "manual:rag-document-import-example",
+          "metadata": {
+            "purpose": "验证 knowledge_documents 导入层级"
+          },
+          "chunks": [
+            {
+              "title": "knowledge_documents 的导入作用",
+              "content": "knowledge_documents 用于表示具体资料来源。curated JSON 支持 document 层级后，document 下的 chunk 会写入 document_id，从而让知识片段可以追踪到具体 PDF、网页、Word 或人工整理资料。",
+              "tags": [
+                "RAG",
+                "资料来源",
+                "导入流程"
+              ],
+              "isActive": true
+            }
+          ],
+          "isActive": true
+        }
+      ],
       "chunks": [
         {
           "title": "RAG 的基本定义",

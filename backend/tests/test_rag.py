@@ -8,7 +8,7 @@ from app import models  # noqa: F401
 from app.curated_import import import_curated_payload, import_curated_payload_with_stats
 from app.database import Base
 from app.llm import AiQuizDraft
-from app.models import KnowledgeChunk, KnowledgeCollection, QuestionBankItem
+from app.models import KnowledgeChunk, KnowledgeCollection, KnowledgeDocument, QuestionBankItem
 from app.rag import debug_retrieve_curated_context, retrieve_curated_context_with_client
 from app.schemas import QuizQuestion
 from app.services import LearningService
@@ -219,7 +219,118 @@ def test_import_curated_payload_upserts_questions_and_chunks():
     assert count == 2
     assert db.query(KnowledgeCollection).count() == 1
     assert db.query(KnowledgeChunk).count() == 1
+    assert db.query(KnowledgeChunk).one().document_id is None
     assert db.query(QuestionBankItem).count() == 1
+
+
+def test_import_curated_payload_creates_documents_and_links_chunks():
+    db = build_db()
+    payload = {
+        "collections": [
+            {
+                "title": "Documented RAG",
+                "documents": [
+                    {
+                        "title": "RAG web source",
+                        "sourceType": "web",
+                        "sourceUri": "https://example.com/rag",
+                        "metadata": {"section": "retrieval"},
+                        "chunks": [
+                            {
+                                "title": "Document chunk",
+                                "content": "Document level chunks should keep source lineage.",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+    first = import_curated_payload(db, payload)
+    second = import_curated_payload(db, payload)
+
+    document = db.query(KnowledgeDocument).one()
+    chunk = db.query(KnowledgeChunk).one()
+    assert first == 1
+    assert second == 1
+    assert db.query(KnowledgeDocument).count() == 1
+    assert db.query(KnowledgeChunk).count() == 1
+    assert document.title == "RAG web source"
+    assert document.source_type == "web"
+    assert document.source_uri == "https://example.com/rag"
+    assert document.metadata_json == {"section": "retrieval"}
+    assert chunk.document_id == document.id
+    assert chunk.source_ref == "https://example.com/rag"
+
+
+def test_import_curated_payload_allows_same_chunk_title_in_different_documents():
+    db = build_db()
+
+    import_curated_payload(
+        db,
+        {
+            "collections": [
+                {
+                    "title": "Duplicate titles",
+                    "documents": [
+                        {
+                            "title": "Doc A",
+                            "sourceUri": "doc-a",
+                            "chunks": [{"title": "Shared title", "content": "A content"}],
+                        },
+                        {
+                            "title": "Doc B",
+                            "sourceUri": "doc-b",
+                            "chunks": [{"title": "Shared title", "content": "B content"}],
+                        },
+                    ],
+                }
+            ]
+        },
+    )
+
+    chunks = sorted(db.query(KnowledgeChunk).all(), key=lambda item: item.content)
+    assert len(chunks) == 2
+    assert {chunk.title for chunk in chunks} == {"Shared title"}
+    assert {chunk.document_id for chunk in chunks} == {
+        document.id for document in db.query(KnowledgeDocument).all()
+    }
+
+
+def test_import_curated_payload_reuses_legacy_chunk_when_moving_under_document():
+    db = build_db()
+    legacy_payload = {
+        "collections": [
+            {
+                "title": "Legacy migration",
+                "chunks": [{"title": "Migrated chunk", "content": "Legacy content"}],
+            }
+        ]
+    }
+    document_payload = {
+        "collections": [
+            {
+                "title": "Legacy migration",
+                "documents": [
+                    {
+                        "title": "Migration source",
+                        "sourceUri": "migration-source",
+                        "chunks": [{"title": "Migrated chunk", "content": "Document content"}],
+                    }
+                ],
+            }
+        ]
+    }
+
+    import_curated_payload(db, legacy_payload)
+    import_curated_payload(db, document_payload)
+
+    document = db.query(KnowledgeDocument).one()
+    chunk = db.query(KnowledgeChunk).one()
+    assert chunk.document_id == document.id
+    assert chunk.content == "Document content"
+    assert chunk.source_ref == "migration-source"
 
 
 def test_import_curated_payload_supports_multiple_choice_format():
@@ -472,6 +583,44 @@ def test_retrieval_ignores_inactive_collections():
     assert context.chunks == []
 
 
+def test_retrieval_ignores_chunks_from_inactive_documents():
+    db = build_db()
+    collection = KnowledgeCollection(title="Document status", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    document = KnowledgeDocument(
+        collection_id=collection.id,
+        title="Inactive document",
+        source_type="manual",
+        source_uri="",
+        metadata_json={},
+        status="inactive",
+        is_active=True,
+    )
+    db.add(document)
+    db.flush()
+    db.add(
+        KnowledgeChunk(
+            collection_id=collection.id,
+            document_id=document.id,
+            title="Document inactive chunk",
+            content="RAG document status should hide this chunk.",
+            source_ref="manual",
+            tags_json=["RAG"],
+            embedding=make_vector(0),
+        )
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "RAG document status",
+        embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
+    )
+
+    assert context.chunks == []
+
+
 def test_import_curated_payload_generates_and_skips_embeddings():
     db = build_db()
     embedding_client = FakeEmbeddingClient()
@@ -520,6 +669,45 @@ def test_import_curated_payload_regenerates_embedding_when_content_changes():
             {
                 "title": "Embedding Import",
                 "chunks": [{"title": "Chunk", "content": "Changed chunk content"}],
+            }
+        ]
+    }
+
+    stats = import_curated_payload_with_stats(db, changed_payload, embedding_client=embedding_client)
+
+    assert stats.embeddings_generated == 1
+    assert stats.embeddings_skipped == 0
+
+
+def test_import_curated_payload_regenerates_chunk_embedding_when_document_changes():
+    db = build_db()
+    embedding_client = FakeEmbeddingClient()
+    payload = {
+        "collections": [
+            {
+                "title": "Embedding Document Import",
+                "documents": [
+                    {
+                        "title": "Original document",
+                        "sourceUri": "stable-source",
+                        "chunks": [{"title": "Chunk", "content": "Chunk content"}],
+                    }
+                ],
+            }
+        ]
+    }
+    import_curated_payload_with_stats(db, payload, embedding_client=embedding_client)
+    changed_payload = {
+        "collections": [
+            {
+                "title": "Embedding Document Import",
+                "documents": [
+                    {
+                        "title": "Renamed document",
+                        "sourceUri": "stable-source",
+                        "chunks": [{"title": "Chunk", "content": "Chunk content"}],
+                    }
+                ],
             }
         ]
     }

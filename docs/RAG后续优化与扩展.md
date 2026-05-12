@@ -51,24 +51,19 @@ RRF 不直接依赖关键词分和向量分的原始尺度，而是分别看两�
 
 当前知识库只有几十条数据，暂时不接 Rerank 是合理的。因为 Rerank 会增加模型调用成本、响应时间和系统复杂度。只有当知识库达到几千个 chunk，或者调试结果显示 top 20 已经包含正确内容但 top 5 经常排序不准时，才值得升级到 `hybrid-rag-v2`。
 
-### 4. `knowledge_documents` 还没有真正进入导入流程
+### 4. `knowledge_documents` 已进入基础导入流程，后续仍需 Pipeline 化
 
-当前已经新增了 `knowledge_documents` 表，用于表示 PDF、网页、Word、截图等具体资料来源。
+当前已经新增了 `knowledge_documents` 表，用于表示 PDF、网页、Word、截图等具体资料来源，并且 curated JSON 已支持 document 层级。
 
-但目前 JSON 导入仍然主要是：
+当前导入可以兼容两种结构：
 
 ```text
 knowledge_collections -> knowledge_chunks
 knowledge_collections -> question_bank_items
-```
-
-还没有真正变成：
-
-```text
 knowledge_collections -> knowledge_documents -> knowledge_chunks
 ```
 
-也就是说，现在系统已经为资料来源建好了位置，但导入逻辑还没有把 chunk 挂到具体 document 上。
+document 下的 chunk 会写入 `document_id`，旧格式 collection 直属 chunk 仍保持兼容。后续更大的工作不再是基础挂载，而是把 PDF、Word、网页、截图等资料自动解析、切片、生成 tags 和 embedding 后写入这个结构。
 
 ### 5. 还没有知识库后台管理能力
 
@@ -159,9 +154,9 @@ POST /api/debug/rag
 
 这个接口应只在开发环境开启，不能直接暴露给正式用户。
 
-### 2. 让 `knowledge_documents` 真正接入导入结构
+### 2. 继续完善 `knowledge_documents` 到资料处理 Pipeline
 
-后续 JSON 可以扩展为支持 document 层级，例如：
+curated JSON 已支持 document 层级，例如：
 
 ```json
 {
@@ -182,7 +177,7 @@ POST /api/debug/rag
 }
 ```
 
-这样每个 chunk 都能追溯来源。后续要做 PDF、网页、截图导入时，这一步是基础。
+这样每个 chunk 都能追溯来源。后续要做 PDF、网页、截图导入时，重点应放在自动解析、清洗、切片和导入任务状态管理。
 
 ### 3. 继续校准关键词检索
 
@@ -299,7 +294,7 @@ hybrid-rag-v2 = 关键词召回 + 向量召回 + Rerank 精排
 1. 继续补充高质量 RAG 数据。
 2. 用 debug 脚本验证检索命中。
 3. 增加开发环境 RAG debug API。
-4. 让 `knowledge_documents` 参与导入流程。
+4. 基于 `knowledge_documents` 建立资料解析和导入 Pipeline。
 
 中期推进：
 
