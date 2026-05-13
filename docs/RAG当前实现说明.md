@@ -59,6 +59,24 @@ questions: 精选题
 
 该 Pipeline 会提取文本、清洗空白、按段落优先切 chunk，并复用 curated 导入流程写入 `knowledge_documents` 和 `knowledge_chunks`。扫描版 PDF、Word、网页、截图 OCR 和异步导入任务仍属于后续扩展。
 
+## 管理接口
+
+当前已提供后端知识库管理 API。配置 `ADMIN_API_TOKEN` 后，请求 `/api/admin/rag/*` 需要携带：
+
+```text
+X-Admin-Token: 你的管理令牌
+```
+
+管理 API 支持：
+
+- 查看 collection、document、chunk 和精选题。
+- 按 collection、document、关键词、状态筛选。
+- 启用或停用 collection/document/chunk/question。
+- 编辑 collection 描述和 tags、document source 元数据、chunk 内容/source/tags、question difficulty/tags。
+- 手动重跑 chunk/question embedding。
+
+当前仍不提供新增、删除、完整题目结构编辑、导入任务日志和小程序后台页面。
+
 导入时会执行：
 
 1. 读取 JSON 中的 collections。
@@ -200,5 +218,5 @@ hybrid-rag-v1.2 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检�
 - 关键词检索已接入 PostgreSQL Full-Text Search，但中文分词依赖数据库是否安装 `pg_jieba`；未安装时会自动降级到 `simple` FTS 和 Python 兜底打分。
 - 混合排序当前使用 RRF 融合关键词结果和向量结果，避免不同检索器的原始分数尺度互相压制。
 - 暂未接入 Rerank；当前数据规模下暂不值得增加复杂度。
-- 暂未实现知识库后台管理、文档上传解析、异步导入任务和检索评估集。
+- 已提供后端知识库管理 API；暂未实现小程序后台页面、文档上传解析、异步导入任务和检索评估集。
 - 运行时 AI 生成题不会自动进入精选题库，避免低质量生成结果污染 `question_bank_items`。

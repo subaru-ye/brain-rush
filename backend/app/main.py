@@ -4,14 +4,15 @@ import logging
 import time
 from functools import lru_cache
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from .auth import create_auth_token, get_current_user_id
+from .auth import create_auth_token, get_current_user_id, require_admin_token
 from .config import get_settings
 from .database import get_db
+from .embeddings import EmbeddingClient
 from .errors import ApiHttpError
 from .feedback import list_wrong_questions, save_question_feedback
 from .history import (
@@ -31,6 +32,20 @@ from .observability import (
     set_request_id,
 )
 from .rate_limit import enforce_generation_rate_limit
+from .rag_admin import (
+    get_admin_chunk,
+    get_admin_question,
+    list_admin_chunks,
+    list_admin_collections,
+    list_admin_documents,
+    list_admin_questions,
+    reembed_admin_chunk,
+    reembed_admin_question,
+    update_admin_chunk,
+    update_admin_collection,
+    update_admin_document,
+    update_admin_question,
+)
 from .schemas import (
     AiGenerationError,
     ApiError,
@@ -45,6 +60,19 @@ from .schemas import (
     HistorySaveResponse,
     QuestionFeedbackRequest,
     QuestionFeedbackResponse,
+    RagAdminChunkItem,
+    RagAdminChunkListResponse,
+    RagAdminChunkUpdateRequest,
+    RagAdminCollectionItem,
+    RagAdminCollectionListResponse,
+    RagAdminCollectionUpdateRequest,
+    RagAdminDocumentItem,
+    RagAdminDocumentListResponse,
+    RagAdminDocumentUpdateRequest,
+    RagAdminQuestionItem,
+    RagAdminQuestionListResponse,
+    RagAdminQuestionUpdateRequest,
+    RagAdminReembedResponse,
     WechatLoginRequest,
     WrongQuestionListResponse,
 )
@@ -223,6 +251,192 @@ def create_app() -> FastAPI:
     ) -> WrongQuestionListResponse:
         return WrongQuestionListResponse(items=list_wrong_questions(db, user_id))
 
+    @app.get(
+        "/api/admin/rag/collections",
+        response_model=RagAdminCollectionListResponse,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_list_collections(
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagAdminCollectionListResponse:
+        return list_admin_collections(db)
+
+    @app.patch(
+        "/api/admin/rag/collections/{collection_id}",
+        response_model=RagAdminCollectionItem,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_update_collection(
+        collection_id: str,
+        payload: RagAdminCollectionUpdateRequest,
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagAdminCollectionItem:
+        return update_admin_collection(db, collection_id, payload)
+
+    @app.get(
+        "/api/admin/rag/documents",
+        response_model=RagAdminDocumentListResponse,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_list_documents(
+        collection_id: str | None = Query(default=None, alias="collectionId"),
+        q: str | None = None,
+        status: str | None = None,
+        is_active: bool | None = Query(default=None, alias="isActive"),
+        limit: int = Query(default=50, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagAdminDocumentListResponse:
+        return list_admin_documents(
+            db,
+            collection_id=collection_id,
+            q=q,
+            status=status,
+            is_active=is_active,
+            limit=limit,
+            offset=offset,
+        )
+
+    @app.patch(
+        "/api/admin/rag/documents/{document_id}",
+        response_model=RagAdminDocumentItem,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_update_document(
+        document_id: str,
+        payload: RagAdminDocumentUpdateRequest,
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagAdminDocumentItem:
+        return update_admin_document(db, document_id, payload)
+
+    @app.get(
+        "/api/admin/rag/chunks",
+        response_model=RagAdminChunkListResponse,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_list_chunks(
+        collection_id: str | None = Query(default=None, alias="collectionId"),
+        document_id: str | None = Query(default=None, alias="documentId"),
+        q: str | None = None,
+        is_active: bool | None = Query(default=None, alias="isActive"),
+        limit: int = Query(default=50, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagAdminChunkListResponse:
+        return list_admin_chunks(
+            db,
+            collection_id=collection_id,
+            document_id=document_id,
+            q=q,
+            is_active=is_active,
+            limit=limit,
+            offset=offset,
+        )
+
+    @app.get(
+        "/api/admin/rag/chunks/{chunk_id}",
+        response_model=RagAdminChunkItem,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_get_chunk(
+        chunk_id: str,
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagAdminChunkItem:
+        return get_admin_chunk(db, chunk_id)
+
+    @app.patch(
+        "/api/admin/rag/chunks/{chunk_id}",
+        response_model=RagAdminChunkItem,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_update_chunk(
+        chunk_id: str,
+        payload: RagAdminChunkUpdateRequest,
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagAdminChunkItem:
+        return update_admin_chunk(db, chunk_id, payload)
+
+    @app.post(
+        "/api/admin/rag/chunks/{chunk_id}/reembed",
+        response_model=RagAdminReembedResponse,
+        responses={400: {"model": ApiError}, 401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_reembed_chunk(
+        chunk_id: str,
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+        embedding_client: EmbeddingClient = Depends(get_admin_embedding_client),
+    ) -> RagAdminReembedResponse:
+        return reembed_admin_chunk(db, chunk_id, embedding_client)
+
+    @app.get(
+        "/api/admin/rag/questions",
+        response_model=RagAdminQuestionListResponse,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_list_questions(
+        collection_id: str | None = Query(default=None, alias="collectionId"),
+        q: str | None = None,
+        is_active: bool | None = Query(default=None, alias="isActive"),
+        limit: int = Query(default=50, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagAdminQuestionListResponse:
+        return list_admin_questions(
+            db,
+            collection_id=collection_id,
+            q=q,
+            is_active=is_active,
+            limit=limit,
+            offset=offset,
+        )
+
+    @app.get(
+        "/api/admin/rag/questions/{question_id}",
+        response_model=RagAdminQuestionItem,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_get_question(
+        question_id: str,
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagAdminQuestionItem:
+        return get_admin_question(db, question_id)
+
+    @app.patch(
+        "/api/admin/rag/questions/{question_id}",
+        response_model=RagAdminQuestionItem,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_update_question(
+        question_id: str,
+        payload: RagAdminQuestionUpdateRequest,
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagAdminQuestionItem:
+        return update_admin_question(db, question_id, payload)
+
+    @app.post(
+        "/api/admin/rag/questions/{question_id}/reembed",
+        response_model=RagAdminReembedResponse,
+        responses={400: {"model": ApiError}, 401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_reembed_question(
+        question_id: str,
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+        embedding_client: EmbeddingClient = Depends(get_admin_embedding_client),
+    ) -> RagAdminReembedResponse:
+        return reembed_admin_question(db, question_id, embedding_client)
+
     return app
 
 
@@ -232,6 +446,10 @@ def get_ai_client() -> LangChainAiClient:
         return LangChainAiClient(get_settings())
     except RuntimeError as exc:
         raise ApiHttpError(status_code=502, code="ai_auth_error", detail=str(exc)) from exc
+
+
+def get_admin_embedding_client() -> EmbeddingClient:
+    return EmbeddingClient(get_settings())
 
 
 def get_learning_service(

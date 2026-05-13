@@ -45,3 +45,14 @@ def get_current_user_id(
         raise ApiHttpError(401, "auth_required", "请先完成登录")
 
     return decode_auth_token(authorization.removeprefix("Bearer ").strip(), settings)
+
+
+def require_admin_token(
+    x_admin_token: Annotated[str | None, Header(alias="X-Admin-Token")] = None,
+    settings: Settings = Depends(get_settings),
+) -> None:
+    expected_token = settings.admin_api_token.strip()
+    if not expected_token:
+        raise ApiHttpError(404, "admin_disabled", "管理接口未启用")
+    if not x_admin_token or x_admin_token.strip() != expected_token:
+        raise ApiHttpError(401, "admin_auth_invalid", "管理接口令牌无效")

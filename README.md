@@ -50,6 +50,7 @@ EMBEDDING_MAX_RETRIES=2
 
 DATABASE_URL=postgresql+psycopg://brain_rush:brain_rush@localhost:5432/brain_rush
 AUTH_TOKEN_SECRET=change-me-in-production
+ADMIN_API_TOKEN=本地管理接口令牌，可留空关闭
 GENERATION_RATE_LIMIT_MAX_REQUESTS=10
 GENERATION_RATE_LIMIT_WINDOW_SECONDS=3600
 ```
@@ -94,6 +95,8 @@ $env:PYTHONPATH = "$pwd\backend"
 ```powershell
 .\backend\scripts\debug-rag.ps1 -Query "RAG 检索效果怎么优化"
 ```
+
+如需启用知识库管理 API，在后端环境变量中配置 `ADMIN_API_TOKEN`，请求 `/api/admin/rag/*` 时携带 `X-Admin-Token`。当前管理 API 支持查看 collection/document/chunk/question、启停、轻量编辑 tags/状态/source 元数据，以及手动重跑 chunk/question embedding。
 
 关键词检索优先使用 PostgreSQL Full-Text Search；如果本地 PostgreSQL 已安装 `pg_jieba`，会使用 `jiebacfg` 做中文分词，否则自动降级到 `simple` FTS 和 Python 兜底打分。可尝试安装本机 PostgreSQL 17 的 `pg_jieba`：
 

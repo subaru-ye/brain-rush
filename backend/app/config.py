@@ -42,6 +42,7 @@ class Settings(BaseSettings):
         alias="AUTH_TOKEN_SECRET",
     )
     auth_token_expire_days: int = Field(default=30, alias="AUTH_TOKEN_EXPIRE_DAYS")
+    admin_api_token: str = Field(default="", alias="ADMIN_API_TOKEN")
     wechat_appid: str = Field(default="", alias="WECHAT_APPID")
     wechat_secret: str = Field(default="", alias="WECHAT_SECRET")
 

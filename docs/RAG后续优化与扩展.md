@@ -65,21 +65,19 @@ knowledge_collections -> knowledge_documents -> knowledge_chunks
 
 document 下的 chunk 会写入 `document_id`，旧格式 collection 直属 chunk 仍保持兼容。后续更大的工作不再是基础挂载，而是扩展到 Word、网页、截图 OCR、异步导入任务和后台审核管理。
 
-### 5. 还没有知识库后台管理能力
+### 5. 已有后端知识库管理 API，仍缺少管理页面和导入任务视图
 
-目前知识库维护主要依赖 JSON 文件和导入脚本。这对开发阶段足够，但长期不够方便。
+目前已经有 `/api/admin/rag/*` 后端管理 API，使用 `ADMIN_API_TOKEN` 和 `X-Admin-Token` 做第一版保护。它可以查看 collection/document/chunk/question，支持启停、轻量编辑 tags/状态/source 元数据，并能触发 chunk/question 重新 embedding。
 
-后续如果知识库越来越多，会需要后台能力：
+后续如果知识库越来越多，还需要继续补齐：
 
-- 查看 collection。
-- 查看 document。
-- 查看 chunk。
-- 编辑 tags。
-- 启用或停用某个 chunk/question。
-- 触发重新 embedding。
+- 小程序或 Web 管理页面。
+- 完整题目结构编辑和校验。
+- 新增和删除能力。
 - 查看导入结果和失败原因。
+- 导入任务进度、失败重试和后台审核流。
 
-没有后台管理时，知识库维护会越来越依赖人工改 JSON，容易出错。
+也就是说，当前已经解决了“只能改 JSON 才能启停/调整知识条目”的问题，但还没有形成完整知识库后台产品。
 
 ### 6. 还没有异步导入任务
 
@@ -306,7 +304,7 @@ hybrid-rag-v2 = 关键词召回 + 向量召回 + Rerank 精排
 后期再做：
 
 1. 接入 Rerank。
-2. 建立知识库后台管理。
+2. 建立知识库管理页面。
 3. 引入异步任务队列。
 4. 做知识库版本管理和审核流。
 

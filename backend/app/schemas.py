@@ -288,3 +288,134 @@ class WrongQuestionItem(BaseModel):
 
 class WrongQuestionListResponse(BaseModel):
     items: list[WrongQuestionItem]
+
+
+class RagAdminCollectionItem(BaseModel):
+    id: str
+    title: str
+    description: str
+    sourceType: str
+    tags: list[str]
+    isActive: bool
+    documentCount: int
+    chunkCount: int
+    questionCount: int
+    createdAt: datetime
+    updatedAt: datetime
+
+
+class RagAdminCollectionListResponse(BaseModel):
+    items: list[RagAdminCollectionItem]
+
+
+class RagAdminCollectionUpdateRequest(BaseModel):
+    description: str | None = Field(default=None, max_length=600)
+    tags: list[str] | None = Field(default=None, max_length=20)
+    isActive: bool | None = None
+
+
+class RagAdminDocumentItem(BaseModel):
+    id: str
+    collectionId: str
+    collectionTitle: str
+    title: str
+    sourceType: str
+    sourceUri: str
+    contentHash: str | None = None
+    metadata: dict
+    status: str
+    isActive: bool
+    chunkCount: int = 0
+    createdAt: datetime
+    updatedAt: datetime
+
+
+class RagAdminDocumentListResponse(BaseModel):
+    items: list[RagAdminDocumentItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class RagAdminDocumentUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=180)
+    sourceUri: str | None = Field(default=None, max_length=500)
+    metadata: dict | None = None
+    status: str | None = Field(default=None, min_length=1, max_length=32)
+    isActive: bool | None = None
+
+
+class RagAdminChunkItem(BaseModel):
+    id: str
+    collectionId: str
+    collectionTitle: str
+    documentId: str | None = None
+    documentTitle: str | None = None
+    title: str
+    content: str
+    sourceRef: str
+    tags: list[str]
+    isActive: bool
+    embeddingModel: str | None = None
+    embeddingVersion: str | None = None
+    contentHash: str | None = None
+    embeddedAt: datetime | None = None
+    createdAt: datetime
+
+
+class RagAdminChunkListResponse(BaseModel):
+    items: list[RagAdminChunkItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class RagAdminChunkUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    content: str | None = Field(default=None, min_length=1)
+    sourceRef: str | None = Field(default=None, max_length=200)
+    tags: list[str] | None = Field(default=None, max_length=20)
+    isActive: bool | None = None
+
+
+class RagAdminQuestionItem(BaseModel):
+    id: str
+    collectionId: str
+    collectionTitle: str
+    stem: str
+    options: list[str]
+    answerIndex: int
+    answerIndexes: list[int]
+    questionType: str
+    explanation: str
+    knowledgePoint: str
+    difficulty: str
+    tags: list[str]
+    isActive: bool
+    embeddingModel: str | None = None
+    embeddingVersion: str | None = None
+    contentHash: str | None = None
+    embeddedAt: datetime | None = None
+    createdAt: datetime
+    updatedAt: datetime
+
+
+class RagAdminQuestionListResponse(BaseModel):
+    items: list[RagAdminQuestionItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class RagAdminQuestionUpdateRequest(BaseModel):
+    difficulty: str | None = Field(default=None, min_length=1, max_length=24)
+    tags: list[str] | None = Field(default=None, max_length=20)
+    isActive: bool | None = None
+
+
+class RagAdminReembedResponse(BaseModel):
+    id: str
+    embeddingModel: str
+    embeddingVersion: str
+    contentHash: str
+    embeddedAt: datetime
