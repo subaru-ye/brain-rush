@@ -41,16 +41,24 @@ def build_db():
     return sessionmaker(bind=engine, autocommit=False, autoflush=False)()
 
 
-def admin_settings(token: str = "secret") -> Settings:
-    return Settings(ADMIN_API_TOKEN=token)
+def admin_settings(token: str = "secret", app_env: str = "development") -> Settings:
+    return Settings(ADMIN_API_TOKEN=token, APP_ENV=app_env)
 
 
-def build_admin_client(db, *, token: str = "secret", embedding_client=None) -> TestClient:
+def build_admin_client(
+    db,
+    *,
+    token: str = "secret",
+    app_env: str = "development",
+    embedding_client=None,
+) -> TestClient:
     def override_db():
         yield db
 
     main_module.app.dependency_overrides[main_module.get_db] = override_db
-    main_module.app.dependency_overrides[main_module.get_settings] = lambda: admin_settings(token)
+    main_module.app.dependency_overrides[main_module.get_settings] = (
+        lambda: admin_settings(token, app_env)
+    )
     if embedding_client is not None:
         main_module.app.dependency_overrides[main_module.get_admin_embedding_client] = (
             lambda: embedding_client
@@ -139,6 +147,65 @@ def test_admin_api_rejects_missing_or_wrong_token():
     assert missing.status_code == 401
     assert wrong.status_code == 401
     assert wrong.json()["code"] == "admin_auth_invalid"
+
+
+def test_rag_debug_api_allows_development_without_token():
+    db = build_db()
+    seed_rag_data(db)
+    client = build_admin_client(db, token="", embedding_client=FakeEmbeddingClient())
+    try:
+        response = client.post("/api/debug/rag", json={"query": "RAG management"})
+    finally:
+        main_module.app.dependency_overrides.clear()
+        client.close()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["query"] == "RAG management"
+    assert payload["retrievalVersion"] == "hybrid-rag-v1.2"
+    assert payload["chunks"][0]["title"] == "Admin chunk"
+    assert "keywordScoreBreakdown" in payload["chunks"][0]
+
+
+def test_rag_debug_api_requires_admin_token_outside_development():
+    db = build_db()
+    seed_rag_data(db)
+    client = build_admin_client(db, app_env="production", embedding_client=FakeEmbeddingClient())
+    try:
+        missing = client.post("/api/debug/rag", json={"query": "RAG management"})
+        wrong = client.post(
+            "/api/debug/rag",
+            headers={"X-Admin-Token": "wrong"},
+            json={"query": "RAG management"},
+        )
+        ok = client.post(
+            "/api/debug/rag",
+            headers=ADMIN_HEADERS,
+            json={"query": "RAG management", "limit": 3},
+        )
+    finally:
+        main_module.app.dependency_overrides.clear()
+        client.close()
+
+    assert missing.status_code == 401
+    assert wrong.status_code == 401
+    assert wrong.json()["code"] == "admin_auth_invalid"
+    assert ok.status_code == 200
+    assert len(ok.json()["chunks"]) <= 3
+
+
+def test_rag_debug_api_validation_errors():
+    db = build_db()
+    client = build_admin_client(db)
+    try:
+        empty_query = client.post("/api/debug/rag", json={"query": "   "})
+        bad_limit = client.post("/api/debug/rag", json={"query": "RAG", "limit": 21})
+    finally:
+        main_module.app.dependency_overrides.clear()
+        client.close()
+
+    assert empty_query.status_code == 422
+    assert bad_limit.status_code == 422
 
 
 def test_admin_collections_list_returns_counts():

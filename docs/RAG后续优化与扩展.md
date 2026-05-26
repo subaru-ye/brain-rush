@@ -65,19 +65,21 @@ knowledge_collections -> knowledge_documents -> knowledge_chunks
 
 document 下的 chunk 会写入 `document_id`，旧格式 collection 直属 chunk 仍保持兼容。后续更大的工作不再是基础挂载，而是扩展到 Word、网页、截图 OCR、异步导入任务和后台审核管理。
 
-### 5. 已有后端知识库管理 API，仍缺少管理页面和导入任务视图
+### 5. 已有基础知识库管理后台，仍缺少导入任务视图和完整审核流
 
 目前已经有 `/api/admin/rag/*` 后端管理 API，使用 `ADMIN_API_TOKEN` 和 `X-Admin-Token` 做第一版保护。它可以查看 collection/document/chunk/question，支持启停、轻量编辑 tags/状态/source 元数据，并能触发 chunk/question 重新 embedding。
 
+当前也已经新增独立 `admin-web` 基础管理端，用于在 Web 页面里查看、搜索、筛选、启停、轻量编辑 collection/document/chunk/question，并手动触发 chunk/question reembed。这已经解决了“只能改 JSON 才能启停/调整知识条目”的问题。
+
 后续如果知识库越来越多，还需要继续补齐：
 
-- 小程序或 Web 管理页面。
+- 导入入口和导入任务视图。
 - 完整题目结构编辑和校验。
 - 新增和删除能力。
 - 查看导入结果和失败原因。
 - 导入任务进度、失败重试和后台审核流。
 
-也就是说，当前已经解决了“只能改 JSON 才能启停/调整知识条目”的问题，但还没有形成完整知识库后台产品。
+也就是说，当前已经具备基础管理页面，但还没有形成完整知识库后台产品。
 
 ### 6. 还没有异步导入任务
 
@@ -133,7 +135,7 @@ AI 生成题
 .\backend\scripts\debug-rag.ps1 -Query "RAG 检索效果怎么优化"
 ```
 
-下一步可以增加开发环境专用 API：
+当前也已经增加开发环境可用的 Debug API 和 `admin-web` Debug 标签页：
 
 ```text
 POST /api/debug/rag
@@ -150,7 +152,7 @@ POST /api/debug/rag
 - sourceIds
 - tags
 
-这个接口应只在开发环境开启，不能直接暴露给正式用户。
+这个接口在 `APP_ENV=development` 时可直接访问；非开发环境需要 `X-Admin-Token`。后续还可以继续把它升级成可保存案例、对比多次检索结果和导出评估样本的工具。
 
 ### 2. 继续完善资料处理 Pipeline
 
@@ -290,8 +292,8 @@ hybrid-rag-v2 = 关键词召回 + 向量召回 + Rerank 精排
 短期优先：
 
 1. 继续补充高质量 RAG 数据。
-2. 用 debug 脚本验证检索命中。
-3. 增加开发环境 RAG debug API。
+2. 用 debug 脚本、Debug API 和 admin-web Debug 页验证检索命中。
+3. 建立检索评估集。
 4. 扩展资料导入 Pipeline 的 URL、Word、OCR 和任务状态能力。
 
 中期推进：
@@ -304,7 +306,7 @@ hybrid-rag-v2 = 关键词召回 + 向量召回 + Rerank 精排
 后期再做：
 
 1. 接入 Rerank。
-2. 建立知识库管理页面。
+2. 完善知识库管理页面的导入任务、批量操作和审核流。
 3. 引入异步任务队列。
 4. 做知识库版本管理和审核流。
 

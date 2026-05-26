@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react"
 
 import {
   API_BASE_URL,
+  debugRag,
   listChunks,
   listCollections,
   listDocuments,
@@ -23,7 +24,9 @@ import {
   type RagAdminChunkItem,
   type RagAdminCollectionItem,
   type RagAdminDocumentItem,
-  type RagAdminQuestionItem
+  type RagAdminQuestionItem,
+  type RagDebugMatch,
+  type RagDebugResponse
 } from "./types"
 
 const PAGE_LIMIT = 50
@@ -32,7 +35,8 @@ const views: Array<{ id: AdminView; label: string; description: string }> = [
   { id: "collections", label: "Collections", description: "知识库集合" },
   { id: "documents", label: "Documents", description: "资料来源" },
   { id: "chunks", label: "Chunks", description: "知识片段" },
-  { id: "questions", label: "Questions", description: "精选题" }
+  { id: "questions", label: "Questions", description: "精选题" },
+  { id: "debug", label: "Debug", description: "检索调试" }
 ]
 
 const emptyFilters: ListFilters = {
@@ -94,7 +98,8 @@ export default function App() {
     collections: "",
     documents: "",
     chunks: "",
-    questions: ""
+    questions: "",
+    debug: ""
   })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -441,7 +446,7 @@ export default function App() {
         <div className="content-grid">
           <section className="list-pane">
             <ViewHeader view={activeView} collections={collections} documents={documents.items} />
-            {activeView !== "collections" ? (
+            {activeView !== "collections" && activeView !== "debug" ? (
               <FilterBar
                 view={activeView}
                 filters={filters}
@@ -487,6 +492,9 @@ export default function App() {
                 onPage={(offset) => void refresh("questions", offset)}
               />
             ) : null}
+            {activeView === "debug" ? (
+              <DebugPanel token={token} onError={handleAuthError} />
+            ) : null}
           </section>
 
           <aside className="inspector">
@@ -513,6 +521,9 @@ export default function App() {
                 onSave={saveQuestion}
                 onReembed={handleReembedQuestion}
               />
+            ) : null}
+            {activeView === "debug" ? (
+              <DebugInspector />
             ) : null}
             {!selectedCollection && activeView === "collections" ? <EmptyInspector /> : null}
             {!selectedDocument && activeView === "documents" ? <EmptyInspector /> : null}
@@ -778,6 +789,150 @@ function QuestionList({
         </div>
       )}
     </>
+  )
+}
+
+function DebugPanel({
+  token,
+  onError
+}: {
+  token: string
+  onError: (error: unknown) => void
+}) {
+  const [query, setQuery] = useState("RAG 检索效果怎么优化")
+  const [limit, setLimit] = useState(5)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [result, setResult] = useState<RagDebugResponse | null>(null)
+
+  async function runDebug(event?: FormEvent) {
+    event?.preventDefault()
+    const normalized = query.trim()
+    if (!normalized) {
+      setError("请输入要调试的查询。")
+      return
+    }
+    const normalizedLimit = Number.isFinite(limit) ? Math.min(20, Math.max(1, limit)) : 5
+    setLimit(normalizedLimit)
+    setLoading(true)
+    setError("")
+    try {
+      setResult(await debugRag(token, { query: normalized, limit: normalizedLimit }))
+    } catch (errorValue) {
+      setError(friendlyError(errorValue))
+      onError(errorValue)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="debug-workspace">
+      <form className="debug-query" onSubmit={(event) => void runDebug(event)}>
+        <label className="field">
+          <span>Query</span>
+          <textarea
+            rows={3}
+            value={query}
+            placeholder="输入一次学习主题或检索问题"
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+        <label className="field compact-field">
+          <span>Limit</span>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={limit}
+            onChange={(event) => setLimit(Number(event.target.value))}
+          />
+        </label>
+        <button className="primary-button" type="submit" disabled={loading}>
+          {loading ? "检索中..." : "运行 Debug"}
+        </button>
+      </form>
+
+      {error ? <div className="alert error">{error}</div> : null}
+
+      {result ? (
+        <div className="debug-results">
+          <div className="debug-result-head">
+            <div>
+              <p className="eyebrow">Retrieval</p>
+              <h2>{result.retrievalVersion}</h2>
+            </div>
+            <div className="summary-strip">
+              <span>{result.questions.length} questions</span>
+              <span>{result.chunks.length} chunks</span>
+            </div>
+          </div>
+          <DebugMatchSection title="Questions" items={result.questions} />
+          <DebugMatchSection title="Chunks" items={result.chunks} />
+        </div>
+      ) : (
+        <div className="empty-list">输入 query 后运行 Debug，查看 RAG 命中详情。</div>
+      )}
+    </div>
+  )
+}
+
+function DebugMatchSection({ title, items }: { title: string; items: RagDebugMatch[] }) {
+  return (
+    <section className="debug-section">
+      <div className="debug-section-title">
+        <h3>{title}</h3>
+        <span>{items.length} matches</span>
+      </div>
+      {!items.length ? <div className="empty-list compact-empty">暂无命中</div> : null}
+      <div className="debug-match-list">
+        {items.map((item) => (
+          <article key={`${item.kind}_${item.id}`} className="debug-match">
+            <div className="debug-match-main">
+              <div>
+                <p className="eyebrow">{item.kind} · {item.collectionTitle}</p>
+                <h4>{item.title}</h4>
+              </div>
+              <div className="score-grid">
+                <Metric label="Keyword" value={item.keywordScore} />
+                <Metric label="Vector" value={item.vectorScore} />
+                <Metric label="Total" value={item.totalScore} />
+              </div>
+            </div>
+            <div className="row-meta debug-meta">
+              <span>keywordRank {item.keywordRank ?? "-"}</span>
+              <span>vectorRank {item.vectorRank ?? "-"}</span>
+              <span>{item.fusionMethod}</span>
+              {item.sourceRef ? <span>{item.sourceRef}</span> : null}
+            </div>
+            {item.tags.length ? (
+              <div className="tag-row">
+                {item.tags.map((tag) => <span key={tag}>{tag}</span>)}
+              </div>
+            ) : null}
+            <BreakdownBars breakdown={item.keywordScoreBreakdown} />
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function BreakdownBars({ breakdown }: { breakdown: RagDebugMatch["keywordScoreBreakdown"] }) {
+  const entries = Object.entries(breakdown)
+  const max = Math.max(...entries.map(([, value]) => value), 0.0001)
+  return (
+    <div className="breakdown-grid">
+      {entries.map(([key, value]) => (
+        <div key={key} className="breakdown-row">
+          <span>{key}</span>
+          <div>
+            <i style={{ width: `${Math.max(3, (value / max) * 100)}%` }} />
+          </div>
+          <strong>{value.toFixed(4)}</strong>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -1052,6 +1207,15 @@ function EmptyInspector() {
     <div className="empty-inspector">
       <h2>未选择项目</h2>
       <p>从左侧列表选择一条记录后，可以查看详情并编辑允许字段。</p>
+    </div>
+  )
+}
+
+function DebugInspector() {
+  return (
+    <div className="empty-inspector">
+      <h2>检索调试</h2>
+      <p>用真实 query 查看关键词、向量和 RRF 融合后的命中结果，判断知识库是否需要补充或调整。</p>
     </div>
   )
 }

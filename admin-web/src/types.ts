@@ -1,4 +1,4 @@
-export type AdminView = "collections" | "documents" | "chunks" | "questions"
+export type AdminView = "collections" | "documents" | "chunks" | "questions" | "debug"
 
 export interface ApiErrorPayload {
   code: string
@@ -148,6 +148,38 @@ export interface RagAdminReembedResponse {
   embeddingVersion: string
   contentHash: string
   embeddedAt: string
+}
+
+export interface RagDebugScoreBreakdown {
+  title: number
+  tags: number
+  body: number
+  source: number
+  collection: number
+}
+
+export interface RagDebugMatch {
+  kind: string
+  id: string
+  collectionId: string
+  collectionTitle: string
+  title: string
+  keywordScore: number
+  vectorScore: number
+  totalScore: number
+  keywordRank?: number | null
+  vectorRank?: number | null
+  fusionMethod: string
+  keywordScoreBreakdown: RagDebugScoreBreakdown
+  tags: string[]
+  sourceRef: string
+}
+
+export interface RagDebugResponse {
+  query: string
+  retrievalVersion: string
+  questions: RagDebugMatch[]
+  chunks: RagDebugMatch[]
 }
 
 export interface ListFilters {

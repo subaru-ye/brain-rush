@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from .auth import create_auth_token, get_current_user_id, require_admin_token
+from .auth import create_auth_token, get_current_user_id, require_admin_token, require_debug_rag_access
 from .config import get_settings
 from .database import get_db
 from .embeddings import EmbeddingClient
@@ -32,6 +32,7 @@ from .observability import (
     set_request_id,
 )
 from .rate_limit import enforce_generation_rate_limit
+from .rag import debug_retrieve_curated_context
 from .rag_admin import (
     get_admin_chunk,
     get_admin_question,
@@ -60,6 +61,8 @@ from .schemas import (
     HistorySaveResponse,
     QuestionFeedbackRequest,
     QuestionFeedbackResponse,
+    RagDebugRequest,
+    RagDebugResponse,
     RagAdminChunkItem,
     RagAdminChunkListResponse,
     RagAdminChunkUpdateRequest,
@@ -250,6 +253,25 @@ def create_app() -> FastAPI:
         db: Session = Depends(get_db),
     ) -> WrongQuestionListResponse:
         return WrongQuestionListResponse(items=list_wrong_questions(db, user_id))
+
+    @app.post(
+        "/api/debug/rag",
+        response_model=RagDebugResponse,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def debug_rag(
+        payload: RagDebugRequest,
+        _: None = Depends(require_debug_rag_access),
+        db: Session = Depends(get_db),
+        embedding_client: EmbeddingClient = Depends(get_admin_embedding_client),
+    ) -> RagDebugResponse:
+        result = debug_retrieve_curated_context(
+            db,
+            payload.query,
+            embedding_client=embedding_client,
+            limit=payload.limit,
+        )
+        return RagDebugResponse.model_validate(result.to_dict())
 
     @app.get(
         "/api/admin/rag/collections",

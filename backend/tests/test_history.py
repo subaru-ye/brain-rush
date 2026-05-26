@@ -11,10 +11,11 @@ from app.config import get_settings
 from app.database import Base
 from app import models  # noqa: F401
 from app.prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
+from app.wechat import WechatSession
 
 
 @pytest.fixture
-def history_client() -> TestClient:
+def history_client(monkeypatch) -> TestClient:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -31,6 +32,11 @@ def history_client() -> TestClient:
             db.close()
 
     main_module.app.dependency_overrides[main_module.get_db] = override_db
+
+    async def fake_exchange_wechat_code(code, settings):
+        return WechatSession(openid=f"test_{code}")
+
+    monkeypatch.setattr(main_module, "exchange_wechat_code", fake_exchange_wechat_code)
     with TestClient(main_module.app) as client:
         yield client
     main_module.app.dependency_overrides.clear()

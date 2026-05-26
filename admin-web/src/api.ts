@@ -13,7 +13,8 @@ import {
   type RagAdminQuestionItem,
   type RagAdminQuestionListResponse,
   type RagAdminQuestionUpdateRequest,
-  type RagAdminReembedResponse
+  type RagAdminReembedResponse,
+  type RagDebugResponse
 } from "./types"
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "")
@@ -175,5 +176,15 @@ export function reembedQuestion(token: string, id: string): Promise<RagAdminReem
   return requestJson<RagAdminReembedResponse>(token, `/api/admin/rag/questions/${id}/reembed`, {
     method: "POST",
     body: JSON.stringify({})
+  })
+}
+
+export function debugRag(
+  token: string,
+  payload: { query: string; limit: number }
+): Promise<RagDebugResponse> {
+  return requestJson<RagDebugResponse>(token, "/api/debug/rag", {
+    method: "POST",
+    body: JSON.stringify(payload)
   })
 }

@@ -187,6 +187,14 @@ hybrid-rag-v1.2 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检�
 .\backend\scripts\debug-rag.ps1 -Query "RAG 检索效果怎么优化"
 ```
 
+也可以使用开发调试 API：
+
+```text
+POST /api/debug/rag
+```
+
+该接口在 `APP_ENV=development` 时可直接访问；非开发环境需要携带 `X-Admin-Token`。独立 `admin-web` 管理端已提供 Debug 标签页，可以输入 query 后查看同一份检索调试结果。
+
 输出会包含：
 
 - `retrievalVersion`

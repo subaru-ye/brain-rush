@@ -290,6 +290,51 @@ class WrongQuestionListResponse(BaseModel):
     items: list[WrongQuestionItem]
 
 
+class RagDebugRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=4000)
+    limit: int = Field(default=5, ge=1, le=20)
+
+    @field_validator("query")
+    @classmethod
+    def normalize_query(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("query 不能为空")
+        return normalized
+
+
+class RagDebugScoreBreakdown(BaseModel):
+    title: float = 0.0
+    tags: float = 0.0
+    body: float = 0.0
+    source: float = 0.0
+    collection: float = 0.0
+
+
+class RagDebugMatch(BaseModel):
+    kind: str
+    id: str
+    collectionId: str
+    collectionTitle: str
+    title: str
+    keywordScore: float
+    vectorScore: float
+    totalScore: float
+    keywordRank: int | None = None
+    vectorRank: int | None = None
+    fusionMethod: str
+    keywordScoreBreakdown: RagDebugScoreBreakdown
+    tags: list[str]
+    sourceRef: str = ""
+
+
+class RagDebugResponse(BaseModel):
+    query: str
+    retrievalVersion: str
+    questions: list[RagDebugMatch]
+    chunks: list[RagDebugMatch]
+
+
 class RagAdminCollectionItem(BaseModel):
     id: str
     title: str

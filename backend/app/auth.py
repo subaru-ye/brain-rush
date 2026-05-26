@@ -56,3 +56,17 @@ def require_admin_token(
         raise ApiHttpError(404, "admin_disabled", "管理接口未启用")
     if not x_admin_token or x_admin_token.strip() != expected_token:
         raise ApiHttpError(401, "admin_auth_invalid", "管理接口令牌无效")
+
+
+def require_debug_rag_access(
+    x_admin_token: Annotated[str | None, Header(alias="X-Admin-Token")] = None,
+    settings: Settings = Depends(get_settings),
+) -> None:
+    if settings.app_env.strip().lower() == "development":
+        return
+
+    expected_token = settings.admin_api_token.strip()
+    if not expected_token:
+        raise ApiHttpError(404, "admin_disabled", "管理接口未启用")
+    if not x_admin_token or x_admin_token.strip() != expected_token:
+        raise ApiHttpError(401, "admin_auth_invalid", "管理接口令牌无效")
