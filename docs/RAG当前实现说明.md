@@ -57,7 +57,13 @@ questions: 精选题
 .\backend\scripts\import-document-rag.ps1 -Path .\docs\rag-notes.md -Collection "RAG 知识库"
 ```
 
-该 Pipeline 会提取文本、清洗空白、按段落优先切 chunk，并复用 curated 导入流程写入 `knowledge_documents` 和 `knowledge_chunks`。扫描版 PDF、Word、网页、截图 OCR 和异步导入任务仍属于后续扩展。
+该 Pipeline 会提取文本、清洗空白、按段落优先切 chunk，并复用 curated 导入流程写入 `knowledge_documents` 和 `knowledge_chunks`。扫描版 PDF、Word、网页和截图 OCR 仍属于后续扩展。
+
+当前也支持通过 `admin-web` 的 Imports 页面上传 `.txt`、`.md` 或文本型 `.pdf`。上传后后端会创建导入任务，交给 Redis + RQ worker 异步执行：
+
+```powershell
+.\backend\scripts\run-rag-worker.ps1
+```
 
 ## 管理接口
 
@@ -74,8 +80,9 @@ X-Admin-Token: 你的管理令牌
 - 启用或停用 collection/document/chunk/question。
 - 编辑 collection 描述和 tags、document source 元数据、chunk 内容/source/tags、question difficulty/tags。
 - 手动重跑 chunk/question embedding。
+- 上传本地资料文件并查看导入任务状态、统计和失败原因。
 
-当前仍不提供新增、删除、完整题目结构编辑、导入任务日志和小程序后台页面。
+当前仍不提供删除、完整题目结构编辑、批量上传、URL/Word/OCR 导入和小程序后台页面。
 
 导入时会执行：
 
@@ -218,6 +225,24 @@ POST /api/debug/rag
 - `vectorScore` 为 0：可能没有配置 embedding，或相关数据没有向量。
 - `keywordScoreBreakdown` 可用于判断命中主要来自标题、tags、正文、来源还是 collection 元数据。
 - `totalScore` 在 `hybrid-rag-v1.2` 中表示 RRF 融合分，不再是关键词分和向量分的直接相加。
+
+## 检索评估
+
+当前提供固定评估集文件：
+
+```text
+backend/data/rag-eval.json
+```
+
+评估项用 `query`、`limit` 和 `expectedMatches` 描述。期望命中按 `kind + collectionTitle + title` 匹配，不依赖数据库 UUID，便于在不同本地数据库之间复用。
+
+运行方式：
+
+```powershell
+.\backend\scripts\eval-rag.ps1
+```
+
+输出包含总用例数、top1/top3/top5 命中率、命中数量和失败案例。评估逻辑复用 `debug_retrieve_curated_context()`，只读数据库，不触发出题或写入。
 - `keywordRank`、`vectorRank` 和 `fusionMethod` 可用于判断排序是否来自关键词、向量或两路共同命中。
 
 ## 当前限制

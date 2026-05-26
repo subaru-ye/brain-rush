@@ -6,25 +6,67 @@ Brain Rush 是一个 AI 闯关学习微信小程序。用户输入学习主题�
 
 ## 当前能力
 
-- 微信小程序前端：Taro + React + TypeScript。
-- Python 后端：FastAPI + LangChain + OpenAI-compatible AI 服务。
-- 用户身份：微信静默登录；开发环境支持本地 fallback 身份。
-- 学习闭环：首页输入 -> 生成题目 -> 闯关答题 -> 生成复盘报告 -> 保存历史。
-- 学习沉淀：历史记录、历史详情、错题本复训、题目质量反馈。
-- 数据库：PostgreSQL + Alembic 管理 schema。
-- RAG：PostgreSQL FTS 优先的关键词检索 + `pgvector` 向量检索，并通过 RRF 融合排序，支持精选题优先返回，不足时基于检索上下文让 AI 补题。
-- 可观测性：结构化日志、`X-Request-ID`、RAG 调试脚本。
+- 小程序学习闭环：输入主题 -> 生成题目 -> 闯关答题 -> 复盘报告 -> 历史记录。
+- 用户沉淀：微信静默身份、历史详情、错题本、题目质量反馈。
+- RAG：精选题优先返回；不足时基于知识片段让 AI 补题。
+- 知识库管理：独立 `admin-web`，支持查看、筛选、启停、轻量编辑、reembed、Debug 和 Imports 上传导入。
+- 数据库：PostgreSQL + Alembic + pgvector。
 
-暂未实现：Word/网页/截图 OCR 自动解析入库、知识库后台管理、异步导入任务、Rerank 精排、支付、排行榜、多人 PK。
+## 日常启动
 
-## 技术栈
+通常需要开 3 个终端：后端、小程序前端、RAG 管理后台。只有使用 Imports 上传导入时，才需要额外开 Redis 和 worker。
 
-- 前端：Taro、React、TypeScript、微信小程序。
-- 后端：FastAPI、LangChain、Pydantic、OpenAI-compatible API。
-- 数据：PostgreSQL、Alembic、pgvector。
-- AI：默认聊天模型配置指向 DeepSeek；embedding 可配置为阿里云百炼或其他 OpenAI-compatible embedding 服务。
+### 1. 启动后端
 
-## 后端本地运行
+```powershell
+$env:PYTHONPATH = "$pwd\backend"
+.\backend\.venv\Scripts\uvicorn app.main:app --app-dir backend --reload --port 8000
+```
+
+后端地址：
+
+```text
+http://127.0.0.1:8000
+```
+
+### 2. 启动小程序前端
+
+```powershell
+npm run dev:weapp
+```
+
+然后用微信开发者工具打开项目根目录。构建产物在 `dist/`。
+
+### 3. 启动 RAG 管理后台
+
+```powershell
+cd admin-web
+npm run dev
+```
+
+管理后台默认连接：
+
+```text
+http://127.0.0.1:8000
+```
+
+进入页面后输入后端 `.env` 里的 `ADMIN_API_TOKEN`。
+
+### 4. 启动导入 worker
+
+只有在 `admin-web` 的 Imports 页面上传资料时才需要这一步。
+
+先确保 Redis 已启动，然后另开一个终端：
+
+```powershell
+.\backend\scripts\run-rag-worker.ps1
+```
+
+Imports 支持上传 `.txt`、`.md` 和文本型 `.pdf`。
+
+## 第一次配置
+
+### 后端依赖
 
 ```powershell
 python -m venv backend\.venv
@@ -32,81 +74,78 @@ python -m venv backend\.venv
 Copy-Item backend\.env.example backend\.env
 ```
 
-在 `backend\.env` 中至少配置：
+### 后端环境变量
+
+编辑 `backend\.env`，重点确认这些值：
 
 ```env
 OPENAI_API_KEY=你的 DeepSeek API Key
 OPENAI_BASE_URL=https://api.deepseek.com
 OPENAI_MODEL=deepseek-v4-flash
-OPENAI_TIMEOUT_SECONDS=60
-OPENAI_MAX_RETRIES=2
-
-EMBEDDING_API_KEY=你的百炼或 OpenAI-compatible Embedding API Key
-EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-EMBEDDING_MODEL=text-embedding-v4
-EMBEDDING_DIMENSIONS=1536
-EMBEDDING_TIMEOUT_SECONDS=30
-EMBEDDING_MAX_RETRIES=2
 
 DATABASE_URL=postgresql+psycopg://brain_rush:brain_rush@localhost:5432/brain_rush
 AUTH_TOKEN_SECRET=change-me-in-production
-ADMIN_API_TOKEN=本地管理接口令牌，可留空关闭
-GENERATION_RATE_LIMIT_MAX_REQUESTS=10
-GENERATION_RATE_LIMIT_WINDOW_SECONDS=3600
+ADMIN_API_TOKEN=本地管理后台令牌
+
+EMBEDDING_API_KEY=你的 Embedding API Key
+EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+EMBEDDING_MODEL=text-embedding-v4
+EMBEDDING_DIMENSIONS=1536
+
+REDIS_URL=redis://localhost:6379/0
+RAG_IMPORT_UPLOAD_DIR=backend/storage/rag-imports
 ```
 
-微信登录相关变量 `WECHAT_APPID`、`WECHAT_SECRET` 可后续补充；开发环境未配置时会使用本地 fallback 身份。
+微信登录相关变量 `WECHAT_APPID`、`WECHAT_SECRET` 可以后续再配。开发环境未配置时会使用本地 fallback 身份。
 
-初始化或升级数据库：
+### 数据库初始化或升级
 
 ```powershell
 .\backend\scripts\init-db.ps1
 ```
 
-如果已有数据库已人工确认等价于当前 schema，可只标记版本：
+### 前端依赖
+
+小程序前端：
 
 ```powershell
-.\backend\scripts\stamp-db.ps1
+npm install
 ```
 
-启动后端：
+RAG 管理后台：
 
 ```powershell
-$env:PYTHONPATH = "$pwd\backend"
-.\backend\.venv\Scripts\uvicorn app.main:app --app-dir backend --reload --port 8000
+cd admin-web
+npm install
 ```
 
-## RAG 数据导入与调试
+## 常用 RAG 命令
 
-导入 curated RAG JSON：
+导入内置 RAG 数据：
 
 ```powershell
 .\backend\scripts\import-curated-rag.ps1 -Path .\backend\data\rag-knowledge.json
 ```
 
-导入本地资料文件到指定知识库，当前支持 `.txt`、`.md` 和文本型 `.pdf`：
+命令行导入本地资料：
 
 ```powershell
 .\backend\scripts\import-document-rag.ps1 -Path .\docs\rag-notes.md -Collection "RAG 知识库"
 ```
 
-查看一次查询命中了哪些题目和知识片段：
+查看单次检索命中：
 
 ```powershell
 .\backend\scripts\debug-rag.ps1 -Query "RAG 检索效果怎么优化"
 ```
 
-如需启用知识库管理 API，在后端环境变量中配置 `ADMIN_API_TOKEN`，请求 `/api/admin/rag/*` 时携带 `X-Admin-Token`。当前管理 API 支持查看 collection/document/chunk/question、启停、轻量编辑 tags/状态/source 元数据，以及手动重跑 chunk/question embedding。
-
-关键词检索优先使用 PostgreSQL Full-Text Search；如果本地 PostgreSQL 已安装 `pg_jieba`，会使用 `jiebacfg` 做中文分词，否则自动降级到 `simple` FTS 和 Python 兜底打分。可尝试安装本机 PostgreSQL 17 的 `pg_jieba`：
+批量评估 RAG 命中率：
 
 ```powershell
-.\backend\scripts\install-pg-jieba.ps1 -PostgresHome "C:\Program Files\PostgreSQL\17" -Database brain_rush -AdminUser postgres
+.\backend\scripts\eval-rag.ps1
 ```
 
-RAG 当前实现说明见 [docs/RAG当前实现说明.md](docs/RAG当前实现说明.md)，后续优化路线见 [docs/RAG后续优化与扩展.md](docs/RAG后续优化与扩展.md)。
-
-## 测试
+## 测试命令
 
 后端测试：
 
@@ -114,38 +153,25 @@ RAG 当前实现说明见 [docs/RAG当前实现说明.md](docs/RAG当前实现�
 .\backend\scripts\test.ps1
 ```
 
-真实模型接口手动验证：
-
-```powershell
-.\backend\scripts\test-real-api.ps1
-```
-
-真实 API 测试会请求 `/api/generate-quiz` 并消耗模型额度；默认输入在 `backend\tests\real_api_manual.py` 中，也可临时覆盖：
-
-```powershell
-$env:REAL_API_QUIZ_INPUT = "Transformer 注意力机制和多头注意力"
-.\backend\scripts\test-real-api.ps1
-```
-
-前端类型检查和构建：
+小程序前端：
 
 ```powershell
 npm run typecheck
 npm run build:weapp
 ```
 
-## 前端本地运行
+RAG 管理后台：
 
 ```powershell
-npm install
-npm run dev:weapp
+cd admin-web
+npm run typecheck
+npm run build
 ```
 
-微信开发者工具打开项目根目录，构建产物在 `dist/`。默认后端地址是 `http://127.0.0.1:8000`，如需调整：
+真实模型接口手动验证会消耗模型额度，平时不需要跑：
 
 ```powershell
-$env:TARO_APP_API_BASE_URL = "http://127.0.0.1:8000"
-npm run build:weapp
+.\backend\scripts\test-real-api.ps1
 ```
 
 ## 文档导航

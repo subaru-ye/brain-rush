@@ -63,36 +63,34 @@ knowledge_collections -> question_bank_items
 knowledge_collections -> knowledge_documents -> knowledge_chunks
 ```
 
-document 下的 chunk 会写入 `document_id`，旧格式 collection 直属 chunk 仍保持兼容。后续更大的工作不再是基础挂载，而是扩展到 Word、网页、截图 OCR、异步导入任务和后台审核管理。
+document 下的 chunk 会写入 `document_id`，旧格式 collection 直属 chunk 仍保持兼容。后续更大的工作不再是基础挂载，而是扩展到 Word、网页、截图 OCR 和后台审核管理。
 
-### 5. 已有基础知识库管理后台，仍缺少导入任务视图和完整审核流
+### 5. 已有基础知识库管理后台和导入任务视图，仍缺少完整审核流
 
 目前已经有 `/api/admin/rag/*` 后端管理 API，使用 `ADMIN_API_TOKEN` 和 `X-Admin-Token` 做第一版保护。它可以查看 collection/document/chunk/question，支持启停、轻量编辑 tags/状态/source 元数据，并能触发 chunk/question 重新 embedding。
 
-当前也已经新增独立 `admin-web` 基础管理端，用于在 Web 页面里查看、搜索、筛选、启停、轻量编辑 collection/document/chunk/question，并手动触发 chunk/question reembed。这已经解决了“只能改 JSON 才能启停/调整知识条目”的问题。
+当前也已经新增独立 `admin-web` 基础管理端，用于在 Web 页面里查看、搜索、筛选、启停、轻量编辑 collection/document/chunk/question，并手动触发 chunk/question reembed。Imports 页面支持上传 `.txt`、`.md` 和文本型 `.pdf`，后端通过 Redis + RQ 异步执行导入任务并记录状态、统计和失败原因。
 
 后续如果知识库越来越多，还需要继续补齐：
 
-- 导入入口和导入任务视图。
 - 完整题目结构编辑和校验。
 - 新增和删除能力。
-- 查看导入结果和失败原因。
-- 导入任务进度、失败重试和后台审核流。
+- 批量上传、取消任务和更细的导入进度。
+- 后台审核流。
 
-也就是说，当前已经具备基础管理页面，但还没有形成完整知识库后台产品。
+也就是说，当前已经具备基础管理页面和导入任务入口，但还没有形成完整知识库后台产品。
 
-### 6. 还没有异步导入任务
+### 6. 已有 Redis + RQ 异步导入任务，仍需增强任务治理
 
-当前导入时会同步调用 embedding 接口。数据少时没问题，但如果后续导入一个大 PDF 或大量网页，可能会切出几百到几千个 chunk。
+当前 `admin-web` 上传导入会创建 `rag_import_jobs` 记录，并交给 Redis + RQ worker 执行 document pipeline。任务会记录 queued/running/succeeded/failed 状态、导入统计和失败原因，failed 任务可以手动 retry。
 
-这时同步导入会带来问题：
+后续仍可继续增强：
 
-- 导入耗时长。
-- 失败后不好恢复。
-- 用户不知道当前处理进度。
-- embedding 调用失败时排查成本高。
-
-后续应考虑导入任务表、后台队列、失败重试和任务状态。
+- 任务取消。
+- 更细粒度进度，例如 loader、cleaner、splitter、embedding 阶段。
+- 批量上传和批量重试。
+- URL、Word、OCR 导入来源。
+- 导入审核和版本回滚。
 
 ### 7. query embedding 暂时没有缓存
 
@@ -153,6 +151,14 @@ POST /api/debug/rag
 - tags
 
 这个接口在 `APP_ENV=development` 时可直接访问；非开发环境需要 `X-Admin-Token`。后续还可以继续把它升级成可保存案例、对比多次检索结果和导出评估样本的工具。
+
+当前也已经新增固定评估集和脚本：
+
+```powershell
+.\backend\scripts\eval-rag.ps1
+```
+
+评估集位于 `backend/data/rag-eval.json`，用 `kind + collectionTitle + title` 描述期望命中，输出 top1/top3/top5 命中率和失败案例。后续可以继续扩展为保存历史评估结果、对比不同检索版本和在 CI 中做最低命中率门禁。
 
 ### 2. 继续完善资料处理 Pipeline
 
@@ -292,22 +298,22 @@ hybrid-rag-v2 = 关键词召回 + 向量召回 + Rerank 精排
 短期优先：
 
 1. 继续补充高质量 RAG 数据。
-2. 用 debug 脚本、Debug API 和 admin-web Debug 页验证检索命中。
-3. 建立检索评估集。
-4. 扩展资料导入 Pipeline 的 URL、Word、OCR 和任务状态能力。
+2. 用 debug 脚本、Debug API、admin-web Debug 页和 eval 脚本验证检索命中。
+3. 继续扩充 `backend/data/rag-eval.json`。
+4. 扩展资料导入 Pipeline 的 URL、Word 和 OCR 能力。
 
 中期推进：
 
 1. 优化混合排序策略。
-2. 建立检索评估集。
+2. 保存历史评估结果，对比不同检索版本。
 3. 继续校准关键词字段权重和中文分词部署。
-4. 扩展资料导入 Pipeline。
+4. 完善导入任务的取消、批量操作和进度展示。
 
 后期再做：
 
 1. 接入 Rerank。
-2. 完善知识库管理页面的导入任务、批量操作和审核流。
-3. 引入异步任务队列。
+2. 完善知识库管理页面的审核流。
+3. 引入更完整的任务编排和失败恢复。
 4. 做知识库版本管理和审核流。
 
 当前最重要的不是继续堆模型，而是让知识库数据更容易维护，让检索效果可以被验证，让资料导入流程逐步从手写 JSON 过渡到自动化。
