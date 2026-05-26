@@ -1,0 +1,37 @@
+{
+  "cases": [
+    {
+      "query": "RAG 是什么，为什么要检索外部知识",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG 的基本定义"
+        }
+      ]
+    },
+    {
+      "query": "关键词检索和向量检索怎么互补",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "关键词检索与向量检索的互补性"
+        }
+      ]
+    },
+    {
+      "query": "knowledge_documents 导入后有什么作用",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "knowledge_documents 的导入作用"
+        }
+      ]
+    }
+  ]
+}
