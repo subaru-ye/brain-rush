@@ -4,13 +4,13 @@ import logging
 import time
 from functools import lru_cache
 
-from fastapi import Depends, FastAPI, Query, Request
+from fastapi import Depends, FastAPI, File, Form, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from .auth import create_auth_token, get_current_user_id, require_admin_token, require_debug_rag_access
-from .config import get_settings
+from .config import Settings, get_settings
 from .database import get_db
 from .embeddings import EmbeddingClient
 from .errors import ApiHttpError
@@ -47,6 +47,12 @@ from .rag_admin import (
     update_admin_document,
     update_admin_question,
 )
+from .rag_import_jobs import (
+    create_upload_import_job,
+    get_import_job,
+    list_import_jobs,
+    retry_import_job,
+)
 from .schemas import (
     AiGenerationError,
     ApiError,
@@ -76,6 +82,8 @@ from .schemas import (
     RagAdminQuestionListResponse,
     RagAdminQuestionUpdateRequest,
     RagAdminReembedResponse,
+    RagImportJobItem,
+    RagImportJobListResponse,
     WechatLoginRequest,
     WrongQuestionListResponse,
 )
@@ -272,6 +280,75 @@ def create_app() -> FastAPI:
             limit=payload.limit,
         )
         return RagDebugResponse.model_validate(result.to_dict())
+
+    @app.post(
+        "/api/admin/rag/imports/upload",
+        response_model=RagImportJobItem,
+        responses={
+            400: {"model": ApiError},
+            401: {"model": ApiError},
+            404: {"model": ApiError},
+            500: {"model": ApiError},
+        },
+    )
+    async def admin_upload_import(
+        collection_title: str = Form(..., alias="collectionTitle", min_length=1, max_length=120),
+        title: str | None = Form(default=None, max_length=180),
+        chunk_size: int = Form(default=1200, alias="chunkSize", ge=200, le=5000),
+        chunk_overlap: int = Form(default=150, alias="chunkOverlap", ge=0, le=1000),
+        file: UploadFile = File(...),
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+        runtime_settings: Settings = Depends(get_settings),
+    ) -> RagImportJobItem:
+        return await create_upload_import_job(
+            db,
+            file,
+            collection_title=collection_title,
+            document_title=title,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            settings=runtime_settings,
+        )
+
+    @app.get(
+        "/api/admin/rag/imports",
+        response_model=RagImportJobListResponse,
+        responses={400: {"model": ApiError}, 401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_list_imports(
+        status: str | None = None,
+        limit: int = Query(default=50, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagImportJobListResponse:
+        return list_import_jobs(db, status=status, limit=limit, offset=offset)
+
+    @app.get(
+        "/api/admin/rag/imports/{job_id}",
+        response_model=RagImportJobItem,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_get_import(
+        job_id: str,
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+    ) -> RagImportJobItem:
+        return get_import_job(db, job_id)
+
+    @app.post(
+        "/api/admin/rag/imports/{job_id}/retry",
+        response_model=RagImportJobItem,
+        responses={400: {"model": ApiError}, 401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_retry_import(
+        job_id: str,
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+        runtime_settings: Settings = Depends(get_settings),
+    ) -> RagImportJobItem:
+        return retry_import_job(db, job_id, runtime_settings)
 
     @app.get(
         "/api/admin/rag/collections",

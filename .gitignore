@@ -1,5 +1,6 @@
 .idea/
 backend/.venv/
+backend/storage/
 __pycache__/
 .pytest_cache/
 *.pyc

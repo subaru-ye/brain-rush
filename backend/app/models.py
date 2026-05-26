@@ -158,6 +158,29 @@ class KnowledgeChunk(Base):
     document: Mapped[KnowledgeDocument | None] = relationship(back_populates="chunks")
 
 
+class RagImportJob(Base):
+    __tablename__ = "rag_import_jobs"
+    __table_args__ = (
+        Index("ix_rag_import_jobs_status_created", "status", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=new_id)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
+    source_type: Mapped[str] = mapped_column(String(40), nullable=False, default="upload")
+    source_uri: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    file_name: Mapped[str] = mapped_column(String(240), nullable=False, default="")
+    collection_title: Mapped[str] = mapped_column(String(120), nullable=False)
+    document_title: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    chunk_size: Mapped[int] = mapped_column(Integer, nullable=False, default=1200)
+    chunk_overlap: Mapped[int] = mapped_column(Integer, nullable=False, default=150)
+    stats_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    queue_job_id: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class QuestionBankItem(Base):
     __tablename__ = "question_bank_items"
     __table_args__ = (Index("ix_question_bank_items_collection_active", "collection_id", "is_active"),)

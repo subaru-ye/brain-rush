@@ -464,3 +464,28 @@ class RagAdminReembedResponse(BaseModel):
     embeddingVersion: str
     contentHash: str
     embeddedAt: datetime
+
+
+class RagImportJobItem(BaseModel):
+    id: str
+    status: str
+    sourceType: str
+    sourceUri: str
+    fileName: str
+    collectionTitle: str
+    documentTitle: str | None = None
+    chunkSize: int
+    chunkOverlap: int
+    stats: dict
+    errorMessage: str
+    queueJobId: str
+    createdAt: datetime
+    startedAt: datetime | None = None
+    finishedAt: datetime | None = None
+
+
+class RagImportJobListResponse(BaseModel):
+    items: list[RagImportJobItem]
+    total: int
+    limit: int
+    offset: int
