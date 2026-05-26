@@ -14,7 +14,9 @@ import {
   type RagAdminQuestionListResponse,
   type RagAdminQuestionUpdateRequest,
   type RagAdminReembedResponse,
-  type RagDebugResponse
+  type RagDebugResponse,
+  type RagImportJobItem,
+  type RagImportJobListResponse
 } from "./types"
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "")
@@ -58,6 +60,27 @@ async function requestJson<TResponse>(
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers
+  })
+
+  if (!response.ok) {
+    throw await parseError(response)
+  }
+
+  return response.json() as Promise<TResponse>
+}
+
+async function requestForm<TResponse>(
+  token: string,
+  path: string,
+  formData: FormData
+): Promise<TResponse> {
+  const headers = new Headers()
+  headers.set("X-Admin-Token", token)
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers,
+    body: formData
   })
 
   if (!response.ok) {
@@ -186,5 +209,47 @@ export function debugRag(
   return requestJson<RagDebugResponse>(token, "/api/debug/rag", {
     method: "POST",
     body: JSON.stringify(payload)
+  })
+}
+
+export function listImportJobs(
+  token: string,
+  params: {
+    status?: string
+    limit?: number
+    offset?: number
+  }
+): Promise<RagImportJobListResponse> {
+  return requestJson<RagImportJobListResponse>(
+    token,
+    `/api/admin/rag/imports${queryString(params)}`
+  )
+}
+
+export function uploadImportJob(
+  token: string,
+  payload: {
+    file: File
+    collectionTitle: string
+    title?: string
+    chunkSize: number
+    chunkOverlap: number
+  }
+): Promise<RagImportJobItem> {
+  const formData = new FormData()
+  formData.set("file", payload.file)
+  formData.set("collectionTitle", payload.collectionTitle)
+  if (payload.title) {
+    formData.set("title", payload.title)
+  }
+  formData.set("chunkSize", String(payload.chunkSize))
+  formData.set("chunkOverlap", String(payload.chunkOverlap))
+  return requestForm<RagImportJobItem>(token, "/api/admin/rag/imports/upload", formData)
+}
+
+export function retryImportJob(token: string, id: string): Promise<RagImportJobItem> {
+  return requestJson<RagImportJobItem>(token, `/api/admin/rag/imports/${id}/retry`, {
+    method: "POST",
+    body: JSON.stringify({})
   })
 }

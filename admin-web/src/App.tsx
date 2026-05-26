@@ -3,16 +3,19 @@ import { FormEvent, useEffect, useMemo, useState } from "react"
 import {
   API_BASE_URL,
   debugRag,
+  listImportJobs,
   listChunks,
   listCollections,
   listDocuments,
   listQuestions,
   reembedChunk,
   reembedQuestion,
+  retryImportJob,
   updateChunk,
   updateCollection,
   updateDocument,
-  updateQuestion
+  updateQuestion,
+  uploadImportJob
 } from "./api"
 import { activeLabel, embeddingLabel, formatDate, parseTags, tagsText } from "./format"
 import { clearAdminToken, getStoredAdminToken, saveAdminToken } from "./storage"
@@ -26,7 +29,8 @@ import {
   type RagAdminDocumentItem,
   type RagAdminQuestionItem,
   type RagDebugMatch,
-  type RagDebugResponse
+  type RagDebugResponse,
+  type RagImportJobItem
 } from "./types"
 
 const PAGE_LIMIT = 50
@@ -36,6 +40,7 @@ const views: Array<{ id: AdminView; label: string; description: string }> = [
   { id: "documents", label: "Documents", description: "资料来源" },
   { id: "chunks", label: "Chunks", description: "知识片段" },
   { id: "questions", label: "Questions", description: "精选题" },
+  { id: "imports", label: "Imports", description: "导入任务" },
   { id: "debug", label: "Debug", description: "检索调试" }
 ]
 
@@ -80,9 +85,25 @@ function statusTone(isActive: boolean): string {
   return isActive ? "pill pill-green" : "pill pill-muted"
 }
 
+function jobStatusTone(status: string): string {
+  if (status === "succeeded") return "pill pill-green"
+  if (status === "failed") return "pill pill-red"
+  if (status === "running") return "pill pill-blue"
+  return "pill pill-muted"
+}
+
 function textPreview(value: string, length = 120): string {
   if (value.length <= length) return value
   return `${value.slice(0, length)}...`
+}
+
+function importStatsLabel(item: RagImportJobItem): string {
+  const total = item.stats.total_imported
+  const generated = item.stats.embeddings_generated
+  if (typeof total === "number") {
+    return `${total} chunks · ${typeof generated === "number" ? generated : 0} embeddings`
+  }
+  return item.errorMessage || "waiting"
 }
 
 export default function App() {
@@ -94,15 +115,18 @@ export default function App() {
   const [documents, setDocuments] = useState<PageState<RagAdminDocumentItem>>(emptyPage)
   const [chunks, setChunks] = useState<PageState<RagAdminChunkItem>>(emptyPage)
   const [questions, setQuestions] = useState<PageState<RagAdminQuestionItem>>(emptyPage)
+  const [imports, setImports] = useState<PageState<RagImportJobItem>>(emptyPage)
   const [selectedIds, setSelectedIds] = useState<Record<AdminView, string>>({
     collections: "",
     documents: "",
     chunks: "",
     questions: "",
+    imports: "",
     debug: ""
   })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [reembedding, setReembedding] = useState(false)
   const [error, setError] = useState("")
   const [notice, setNotice] = useState("")
@@ -122,6 +146,10 @@ export default function App() {
   const selectedQuestion = useMemo(
     () => questions.items.find((item) => item.id === selectedIds.questions) || questions.items[0],
     [questions.items, selectedIds.questions]
+  )
+  const selectedImport = useMemo(
+    () => imports.items.find((item) => item.id === selectedIds.imports) || imports.items[0],
+    [imports.items, selectedIds.imports]
   )
 
   useEffect(() => {
@@ -197,6 +225,17 @@ export default function App() {
         setQuestions(response)
         if (response.items[0]) {
           setSelectedIds((current) => ({ ...current, questions: response.items[0].id }))
+        }
+      }
+      if (view === "imports") {
+        const response = await listImportJobs(token, {
+          status: filters.status,
+          limit: PAGE_LIMIT,
+          offset: offset ?? imports.offset
+        })
+        setImports(response)
+        if (response.items[0]) {
+          setSelectedIds((current) => ({ ...current, imports: response.items[0].id }))
         }
       }
     } catch (errorValue) {
@@ -377,6 +416,46 @@ export default function App() {
     }
   }
 
+  async function handleUploadImport(payload: {
+    file: File
+    collectionTitle: string
+    title: string
+    chunkSize: number
+    chunkOverlap: number
+  }) {
+    setUploading(true)
+    setError("")
+    setNotice("")
+    try {
+      const created = await uploadImportJob(token, payload)
+      setImports((page) => ({ ...page, items: [created, ...page.items], total: page.total + 1 }))
+      setSelectedIds((current) => ({ ...current, imports: created.id }))
+      setNotice("导入任务已入队，请启动 RQ worker 后刷新查看状态。")
+    } catch (errorValue) {
+      handleAuthError(errorValue)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleRetryImport(item: RagImportJobItem) {
+    setSaving(true)
+    setError("")
+    setNotice("")
+    try {
+      const updated = await retryImportJob(token, item.id)
+      setImports((page) => ({
+        ...page,
+        items: page.items.map((entry) => (entry.id === updated.id ? updated : entry))
+      }))
+      setNotice("导入任务已重新入队。")
+    } catch (errorValue) {
+      handleAuthError(errorValue)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (!token) {
     return (
       <main className="token-screen">
@@ -446,7 +525,7 @@ export default function App() {
         <div className="content-grid">
           <section className="list-pane">
             <ViewHeader view={activeView} collections={collections} documents={documents.items} />
-            {activeView !== "collections" && activeView !== "debug" ? (
+            {activeView !== "collections" && activeView !== "imports" && activeView !== "debug" ? (
               <FilterBar
                 view={activeView}
                 filters={filters}
@@ -492,6 +571,23 @@ export default function App() {
                 onPage={(offset) => void refresh("questions", offset)}
               />
             ) : null}
+            {activeView === "imports" ? (
+              <ImportWorkspace
+                page={imports}
+                collections={collections}
+                selectedId={selectedImport?.id}
+                loading={loading}
+                uploading={uploading}
+                saving={saving}
+                status={filters.status}
+                onStatusChange={(status) => updateFilter("status", status)}
+                onApply={() => void refresh("imports", 0)}
+                onUpload={handleUploadImport}
+                onRetry={handleRetryImport}
+                onSelect={(id) => setSelectedIds((current) => ({ ...current, imports: id }))}
+                onPage={(offset) => void refresh("imports", offset)}
+              />
+            ) : null}
             {activeView === "debug" ? (
               <DebugPanel token={token} onError={handleAuthError} />
             ) : null}
@@ -522,6 +618,9 @@ export default function App() {
                 onReembed={handleReembedQuestion}
               />
             ) : null}
+            {activeView === "imports" && selectedImport ? (
+              <ImportInspector item={selectedImport} saving={saving} onRetry={handleRetryImport} />
+            ) : null}
             {activeView === "debug" ? (
               <DebugInspector />
             ) : null}
@@ -529,6 +628,7 @@ export default function App() {
             {!selectedDocument && activeView === "documents" ? <EmptyInspector /> : null}
             {!selectedChunk && activeView === "chunks" ? <EmptyInspector /> : null}
             {!selectedQuestion && activeView === "questions" ? <EmptyInspector /> : null}
+            {!selectedImport && activeView === "imports" ? <EmptyInspector /> : null}
           </aside>
         </div>
       </section>
@@ -785,6 +885,211 @@ function QuestionList({
                 <span>{embeddingLabel(item.embeddedAt)}</span>
               </div>
             </button>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+function ImportWorkspace({
+  page,
+  collections,
+  selectedId,
+  loading,
+  uploading,
+  saving,
+  status,
+  onStatusChange,
+  onApply,
+  onUpload,
+  onRetry,
+  onSelect,
+  onPage
+}: {
+  page: PageState<RagImportJobItem>
+  collections: RagAdminCollectionItem[]
+  selectedId?: string
+  loading: boolean
+  uploading: boolean
+  saving: boolean
+  status: string
+  onStatusChange: (status: string) => void
+  onApply: () => void
+  onUpload: (payload: {
+    file: File
+    collectionTitle: string
+    title: string
+    chunkSize: number
+    chunkOverlap: number
+  }) => Promise<void>
+  onRetry: (item: RagImportJobItem) => Promise<void>
+  onSelect: (id: string) => void
+  onPage: (offset: number) => void
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const [collectionTitle, setCollectionTitle] = useState(collections[0]?.title || "")
+  const [title, setTitle] = useState("")
+  const [chunkSize, setChunkSize] = useState(1200)
+  const [chunkOverlap, setChunkOverlap] = useState(150)
+  const [localError, setLocalError] = useState("")
+
+  useEffect(() => {
+    if (!collectionTitle && collections[0]) {
+      setCollectionTitle(collections[0].title)
+    }
+  }, [collectionTitle, collections])
+
+  async function submitUpload(event: FormEvent) {
+    event.preventDefault()
+    if (!file) {
+      setLocalError("请选择要上传的 .txt、.md 或 .pdf 文件。")
+      return
+    }
+    if (!collectionTitle.trim()) {
+      setLocalError("请选择或填写 collection。")
+      return
+    }
+    if (chunkOverlap >= chunkSize) {
+      setLocalError("Chunk overlap 必须小于 chunk size。")
+      return
+    }
+    setLocalError("")
+    await onUpload({
+      file,
+      collectionTitle: collectionTitle.trim(),
+      title: title.trim(),
+      chunkSize,
+      chunkOverlap
+    })
+    setFile(null)
+    setTitle("")
+  }
+
+  return (
+    <div className="imports-workspace">
+      <form className="import-upload" onSubmit={(event) => void submitUpload(event)}>
+        <label className="field">
+          <span>File</span>
+          <input
+            type="file"
+            accept=".txt,.md,.pdf"
+            onChange={(event) => setFile(event.target.files?.[0] || null)}
+          />
+        </label>
+        <label className="field">
+          <span>Collection</span>
+          <input
+            list="collection-title-options"
+            value={collectionTitle}
+            onChange={(event) => setCollectionTitle(event.target.value)}
+          />
+          <datalist id="collection-title-options">
+            {collections.map((item) => <option key={item.id} value={item.title} />)}
+          </datalist>
+        </label>
+        <label className="field">
+          <span>Title</span>
+          <input
+            value={title}
+            placeholder="默认使用文件名"
+            onChange={(event) => setTitle(event.target.value)}
+          />
+        </label>
+        <label className="field compact-field">
+          <span>Size</span>
+          <input
+            type="number"
+            min={200}
+            max={5000}
+            value={chunkSize}
+            onChange={(event) => setChunkSize(Number(event.target.value))}
+          />
+        </label>
+        <label className="field compact-field">
+          <span>Overlap</span>
+          <input
+            type="number"
+            min={0}
+            max={1000}
+            value={chunkOverlap}
+            onChange={(event) => setChunkOverlap(Number(event.target.value))}
+          />
+        </label>
+        <button className="primary-button" type="submit" disabled={uploading}>
+          {uploading ? "上传中..." : "上传并入队"}
+        </button>
+      </form>
+      {localError ? <div className="alert error">{localError}</div> : null}
+      <div className="import-filter">
+        <select value={status} onChange={(event) => onStatusChange(event.target.value)}>
+          <option value="">All statuses</option>
+          <option value="queued">queued</option>
+          <option value="running">running</option>
+          <option value="succeeded">succeeded</option>
+          <option value="failed">failed</option>
+        </select>
+        <button type="button" className="primary-button compact" onClick={onApply}>应用筛选</button>
+      </div>
+      <ImportList
+        page={page}
+        selectedId={selectedId}
+        loading={loading}
+        saving={saving}
+        onSelect={onSelect}
+        onRetry={onRetry}
+        onPage={onPage}
+      />
+    </div>
+  )
+}
+
+function ImportList({
+  page,
+  selectedId,
+  loading,
+  saving,
+  onSelect,
+  onRetry,
+  onPage
+}: {
+  page: PageState<RagImportJobItem>
+  selectedId?: string
+  loading: boolean
+  saving: boolean
+  onSelect: (id: string) => void
+  onRetry: (item: RagImportJobItem) => Promise<void>
+  onPage: (offset: number) => void
+}) {
+  return (
+    <>
+      <PagedHeader page={page} loading={loading} onPage={onPage} />
+      {!page.items.length ? <EmptyList label="暂无 import jobs" /> : (
+        <div className="row-list">
+          {page.items.map((item) => (
+            <div key={item.id} className={selectedId === item.id ? "data-row import-row selected" : "data-row import-row"}>
+              <button type="button" className="row-main-button" onClick={() => onSelect(item.id)}>
+                <div>
+                  <strong>{item.fileName}</strong>
+                  <span>{item.collectionTitle} · {item.documentTitle || "默认标题"}</span>
+                </div>
+                <div className="row-meta">
+                  <span className={jobStatusTone(item.status)}>{item.status}</span>
+                  <span>{importStatsLabel(item)}</span>
+                  <span>{formatDate(item.createdAt)}</span>
+                </div>
+              </button>
+              {item.status !== "succeeded" ? (
+                <button
+                  type="button"
+                  className="ghost-button compact"
+                  disabled={saving}
+                  onClick={() => void onRetry(item)}
+                >
+                  {item.status === "failed" ? "Retry" : "Requeue"}
+                </button>
+              ) : null}
+            </div>
           ))}
         </div>
       )}
@@ -1199,6 +1504,43 @@ function InspectorFrame({
       </div>
       {children}
     </div>
+  )
+}
+
+function ImportInspector({
+  item,
+  saving,
+  onRetry
+}: {
+  item: RagImportJobItem
+  saving: boolean
+  onRetry: (item: RagImportJobItem) => Promise<void>
+}) {
+  return (
+    <InspectorFrame title={item.fileName} eyebrow="Import job">
+      <div className="summary-strip inspector-status">
+        <span className={jobStatusTone(item.status)}>{item.status}</span>
+      </div>
+      <Readonly label="ID" value={item.id} />
+      <Readonly label="Queue job" value={item.queueJobId || "-"} />
+      <Readonly label="Collection" value={item.collectionTitle} />
+      <Readonly label="Document title" value={item.documentTitle || "-"} />
+      <Readonly label="Source URI" value={item.sourceUri || "-"} multiline />
+      <div className="metric-grid">
+        <Metric label="Chunk size" value={item.chunkSize} />
+        <Metric label="Overlap" value={item.chunkOverlap} />
+      </div>
+      <Readonly label="Stats" value={JSON.stringify(item.stats, null, 2)} multiline />
+      {item.errorMessage ? <Readonly label="Error" value={item.errorMessage} multiline /> : null}
+      <Readonly label="Created" value={formatDate(item.createdAt)} />
+      <Readonly label="Started" value={formatDate(item.startedAt)} />
+      <Readonly label="Finished" value={formatDate(item.finishedAt)} />
+      {item.status !== "succeeded" ? (
+        <button className="primary-button" type="button" disabled={saving} onClick={() => void onRetry(item)}>
+          {saving ? "入队中..." : item.status === "failed" ? "Retry Import" : "Requeue Import"}
+        </button>
+      ) : null}
+    </InspectorFrame>
   )
 }
 

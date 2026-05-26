@@ -238,6 +238,16 @@ button:disabled {
   color: #6b787c;
 }
 
+.pill-blue {
+  background: #e7f0fb;
+  color: #245d9a;
+}
+
+.pill-red {
+  background: #fff0f0;
+  color: #a82626;
+}
+
 .filter-bar {
   display: grid;
   grid-template-columns: 180px 180px 150px 180px minmax(220px, 1fr) auto;
@@ -387,6 +397,66 @@ button:disabled {
 
 .row-meta span {
   margin-top: 0;
+}
+
+.imports-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.import-upload {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(180px, 1fr) minmax(180px, 1fr);
+  gap: 10px;
+  align-items: end;
+  border: 1px solid #dce5e2;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.import-upload .compact-field {
+  max-width: 150px;
+}
+
+.import-upload .primary-button {
+  width: 150px;
+}
+
+.import-filter {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.import-filter select {
+  width: 190px;
+  height: 40px;
+  border: 1px solid #ccd5d2;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0 11px;
+}
+
+.import-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.row-main-button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+}
+
+.inspector-status {
+  justify-content: flex-start;
 }
 
 .page-row {
@@ -747,6 +817,14 @@ button:disabled {
   }
 
   .filter-bar .search-input {
+    grid-column: span 2;
+  }
+
+  .import-upload {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .import-upload .primary-button {
     grid-column: span 2;
   }
 

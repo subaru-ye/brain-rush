@@ -1,4 +1,4 @@
-export type AdminView = "collections" | "documents" | "chunks" | "questions" | "debug"
+export type AdminView = "collections" | "documents" | "chunks" | "questions" | "imports" | "debug"
 
 export interface ApiErrorPayload {
   code: string
@@ -180,6 +180,31 @@ export interface RagDebugResponse {
   retrievalVersion: string
   questions: RagDebugMatch[]
   chunks: RagDebugMatch[]
+}
+
+export interface RagImportJobItem {
+  id: string
+  status: string
+  sourceType: string
+  sourceUri: string
+  fileName: string
+  collectionTitle: string
+  documentTitle?: string | null
+  chunkSize: number
+  chunkOverlap: number
+  stats: Record<string, unknown>
+  errorMessage: string
+  queueJobId: string
+  createdAt: string
+  startedAt?: string | null
+  finishedAt?: string | null
+}
+
+export interface RagImportJobListResponse {
+  items: RagImportJobItem[]
+  total: number
+  limit: number
+  offset: number
 }
 
 export interface ListFilters {
