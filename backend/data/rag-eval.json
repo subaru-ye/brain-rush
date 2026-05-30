@@ -2,6 +2,7 @@
   "cases": [
     {
       "query": "RAG 是什么，为什么要检索外部知识",
+      "category": "fundamentals",
       "limit": 5,
       "expectedMatches": [
         {
@@ -12,7 +13,193 @@
       ]
     },
     {
+      "query": "检索增强生成的核心价值是什么",
+      "category": "fundamentals",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG的定义与核心价值"
+        }
+      ]
+    },
+    {
+      "query": "传统 RAG 找缝写分别是什么意思",
+      "category": "fundamentals",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "传统RAG的核心流程"
+        }
+      ]
+    },
+    {
+      "query": "RAG 和微调有什么区别，什么时候选 RAG",
+      "category": "fundamentals",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG 与模型微调的区别"
+        },
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG与模型微调的区别及适用场景"
+        }
+      ]
+    },
+    {
+      "query": "RAG 索引阶段和查询阶段分别做什么",
+      "category": "indexing",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG 的两阶段结构"
+        }
+      ]
+    },
+    {
+      "query": "查询阶段为什么要把用户输入转成 query embedding",
+      "category": "indexing",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG 的两阶段结构"
+        }
+      ]
+    },
+    {
+      "query": "knowledge_documents 导入后有什么作用",
+      "category": "documents",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "knowledge_documents 的导入作用"
+        }
+      ]
+    },
+    {
+      "query": "document_id 能帮助 chunk 追踪资料来源吗",
+      "category": "documents",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "knowledge_documents 的导入作用"
+        }
+      ]
+    },
+    {
+      "query": "文档为什么要切成 chunk",
+      "category": "chunking",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "文档切分的作用"
+        }
+      ]
+    },
+    {
+      "query": "chunk 切得过短或过长会有什么问题",
+      "category": "chunking",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "文档切分的作用"
+        }
+      ]
+    },
+    {
+      "query": "文档预处理时为什么不建议固定长度一刀切",
+      "category": "chunking",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "文档预处理优化策略"
+        }
+      ]
+    },
+    {
+      "query": "Embedding 在 RAG 里起什么作用",
+      "category": "embeddings",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "Embedding 的作用"
+        }
+      ]
+    },
+    {
+      "query": "语义相近但字面不同的内容为什么也能被召回",
+      "category": "embeddings",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "Embedding 的作用"
+        }
+      ]
+    },
+    {
+      "query": "Embedding 模型和 Reranker 模型有什么区别",
+      "category": "embeddings",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "Embedding模型与Reranker模型的区别"
+        }
+      ]
+    },
+    {
+      "query": "向量数据库在 RAG 中保存什么",
+      "category": "vector_db",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "向量数据库在 RAG 中的角色"
+        }
+      ]
+    },
+    {
+      "query": "向量数据库为什么还要保存原文和元数据",
+      "category": "vector_db",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "向量数据库在 RAG 中的角色"
+        }
+      ]
+    },
+    {
       "query": "关键词检索和向量检索怎么互补",
+      "category": "hybrid_retrieval",
       "limit": 5,
       "expectedMatches": [
         {
@@ -23,13 +210,314 @@
       ]
     },
     {
-      "query": "knowledge_documents 导入后有什么作用",
+      "query": "为什么纯向量检索对专有名词和数字不稳定",
+      "category": "hybrid_retrieval",
       "limit": 5,
       "expectedMatches": [
         {
           "kind": "chunk",
           "collectionTitle": "RAG 知识库",
-          "title": "knowledge_documents 的导入作用"
+          "title": "混合检索与重排序优化"
+        }
+      ]
+    },
+    {
+      "query": "混合检索为什么要用 RRF 融合排序",
+      "category": "hybrid_retrieval",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "混合检索与重排序优化"
+        }
+      ]
+    },
+    {
+      "query": "RAG 检索效果差通常要优化哪些环节",
+      "category": "hybrid_retrieval",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG检索效果优化核心环节"
+        }
+      ]
+    },
+    {
+      "query": "Top K 设置太大为什么会干扰生成",
+      "category": "hybrid_retrieval",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "Top K 召回的意义"
+        }
+      ]
+    },
+    {
+      "query": "重排在 RAG 链路中什么时候发生",
+      "category": "rerank",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "重排在 RAG 中的作用"
+        }
+      ]
+    },
+    {
+      "query": "Rerank 为什么能提升候选文档相关性",
+      "category": "rerank",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "Rerank的定义与作用"
+        }
+      ]
+    },
+    {
+      "query": "Cross Encoder 为什么比 Bi Encoder 精排更准",
+      "category": "rerank",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "Embedding模型与Reranker模型的区别"
+        }
+      ]
+    },
+    {
+      "query": "pgvector 支持哪些距离和索引",
+      "category": "pgvector",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "pgvector 的距离与索引"
+        }
+      ]
+    },
+    {
+      "query": "cosine distance 在文本 embedding 检索中衡量什么",
+      "category": "pgvector",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "pgvector 的距离与索引"
+        }
+      ]
+    },
+    {
+      "query": "HNSW 和 IVFFlat 在 pgvector 里有什么作用",
+      "category": "pgvector",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "pgvector 的距离与索引"
+        }
+      ]
+    },
+    {
+      "query": "评估 RAG 为什么要分开看检索质量和生成质量",
+      "category": "evaluation",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG 评估的两个层面"
+        }
+      ]
+    },
+    {
+      "query": "RAGAS 评估通常看哪些维度",
+      "category": "evaluation",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAGAS 的评估思路"
+        }
+      ]
+    },
+    {
+      "query": "Recall@K 和 MRR 分别怎么理解",
+      "category": "evaluation",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG检索效果评估指标与方法"
+        }
+      ]
+    },
+    {
+      "query": "为什么只看最终答案会掩盖检索阶段问题",
+      "category": "evaluation",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG 评估的两个层面"
+        }
+      ]
+    },
+    {
+      "query": "RAG 能不能完全消除幻觉",
+      "category": "reliability",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG 不能完全消除幻觉"
+        }
+      ]
+    },
+    {
+      "query": "RAG 有哪些局限性，怎么缓解",
+      "category": "reliability",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG的局限性与解决方案"
+        }
+      ]
+    },
+    {
+      "query": "上下文窗口有限时应该怎么处理检索片段",
+      "category": "reliability",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "RAG的局限性与解决方案"
+        }
+      ]
+    },
+    {
+      "query": "Advanced RAG 的检索前检索中检索后优化包括什么",
+      "category": "preprocessing",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "Advanced RAG的优化方向"
+        }
+      ]
+    },
+    {
+      "query": "文档预处理包括数据清洗语义切片和元数据注入吗",
+      "category": "preprocessing",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "文档预处理优化策略"
+        }
+      ]
+    },
+    {
+      "query": "PDF Word 网页分别应该怎么切片处理",
+      "category": "preprocessing",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "多格式文档的切片处理方案"
+        }
+      ]
+    },
+    {
+      "query": "用户提问很口语化时怎么做查询增强",
+      "category": "query_enhancement",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "查询增强优化方法"
+        }
+      ]
+    },
+    {
+      "query": "查询重写和查询扩展有什么用",
+      "category": "query_enhancement",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "查询增强优化方法"
+        }
+      ]
+    },
+    {
+      "query": "向量检索 top_k 相似度阈值和索引类型怎么调",
+      "category": "tuning",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "向量检索调参细节"
+        }
+      ]
+    },
+    {
+      "query": "百万级向量数据为什么可以考虑 HNSW 索引",
+      "category": "tuning",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "向量检索调参细节"
+        }
+      ]
+    },
+    {
+      "query": "滑动窗口切片导致重复检索结果时怎么去重",
+      "category": "dedup",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "检索结果去重方法"
+        }
+      ]
+    },
+    {
+      "query": "同一个文档最多召回几条可以减少重复内容",
+      "category": "dedup",
+      "limit": 5,
+      "expectedMatches": [
+        {
+          "kind": "chunk",
+          "collectionTitle": "RAG 知识库",
+          "title": "检索结果去重方法"
         }
       ]
     }

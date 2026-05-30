@@ -50,6 +50,7 @@ def test_rag_eval_reports_title_match_hits():
         [
             {
                 "query": "RAG 为什么要检索外部知识",
+                "category": "fundamentals",
                 "expectedMatches": [
                     {
                         "kind": "chunk",
@@ -66,6 +67,10 @@ def test_rag_eval_reports_title_match_hits():
     assert summary["top3"] == 1.0
     assert summary["top5"] == 1.0
     assert summary["failures"] == []
+    assert summary["categoryOrder"] == ["fundamentals"]
+    assert summary["byCategory"]["fundamentals"]["total"] == 1
+    assert summary["byCategory"]["fundamentals"]["top1"] == 1.0
+    assert summary["byCategory"]["fundamentals"]["failures"] == []
 
 
 def test_rag_eval_reports_failures_with_actual_matches():
@@ -77,6 +82,7 @@ def test_rag_eval_reports_failures_with_actual_matches():
         [
             {
                 "query": "RAG 为什么要检索外部知识",
+                "category": "fundamentals",
                 "expectedMatches": [
                     {
                         "kind": "chunk",
@@ -90,7 +96,39 @@ def test_rag_eval_reports_failures_with_actual_matches():
 
     assert summary["total"] == 1
     assert summary["top5"] == 0.0
+    assert summary["failures"][0]["category"] == "fundamentals"
     assert summary["failures"][0]["actualMatches"][0]["title"] == "RAG 的基本定义"
+    assert summary["byCategory"]["fundamentals"]["top5"] == 0.0
+    assert summary["byCategory"]["fundamentals"]["failures"][0]["category"] == "fundamentals"
+    assert (
+        summary["byCategory"]["fundamentals"]["failures"][0]["actualMatches"][0]["title"]
+        == "RAG 的基本定义"
+    )
+
+
+def test_rag_eval_groups_legacy_cases_as_uncategorized():
+    db = build_db()
+    seed_eval_data(db)
+
+    summary = run_rag_eval(
+        db,
+        [
+            {
+                "query": "RAG 为什么要检索外部知识",
+                "expectedMatches": [
+                    {
+                        "kind": "chunk",
+                        "collectionTitle": "RAG 知识库",
+                        "title": "RAG 的基本定义",
+                    }
+                ],
+            }
+        ],
+    ).to_dict()
+
+    assert summary["categoryOrder"] == ["uncategorized"]
+    assert summary["byCategory"]["uncategorized"]["total"] == 1
+    assert summary["byCategory"]["uncategorized"]["top5"] == 1.0
 
 
 def test_rag_eval_handles_empty_cases():
@@ -101,3 +139,5 @@ def test_rag_eval_handles_empty_cases():
     assert summary["total"] == 0
     assert summary["top1"] == 0.0
     assert summary["failures"] == []
+    assert summary["byCategory"] == {}
+    assert summary["categoryOrder"] == []

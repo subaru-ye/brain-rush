@@ -236,7 +236,7 @@ POST /api/debug/rag
 backend/data/rag-eval.json
 ```
 
-评估项用 `query`、`limit` 和 `expectedMatches` 描述。期望命中按 `kind + collectionTitle + title` 匹配，不依赖数据库 UUID，便于在不同本地数据库之间复用。
+评估项用 `query`、`category`、`limit` 和 `expectedMatches` 描述。期望命中按 `kind + collectionTitle + title` 匹配，不依赖数据库 UUID，便于在不同本地数据库之间复用。
 
 运行方式：
 
@@ -244,7 +244,7 @@ backend/data/rag-eval.json
 .\backend\scripts\eval-rag.ps1
 ```
 
-输出包含总用例数、top1/top3/top5 命中率、命中数量和失败案例。评估逻辑复用 `debug_retrieve_curated_context()`，只读数据库，不触发出题或写入。
+输出包含总用例数、top1/top3/top5 命中率、命中数量、失败案例，以及按 `category` 聚合的分类统计，用于判断 chunking、embedding、hybrid retrieval、rerank、evaluation 等主题哪里搜得好、哪里搜得差。评估逻辑复用 `debug_retrieve_curated_context()`，只读数据库，不触发出题或写入。
 - `keywordRank`、`vectorRank` 和 `fusionMethod` 可用于判断排序是否来自关键词、向量或两路共同命中。
 
 ## 当前限制

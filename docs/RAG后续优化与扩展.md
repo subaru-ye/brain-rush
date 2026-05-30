@@ -158,7 +158,7 @@ POST /api/debug/rag
 .\backend\scripts\eval-rag.ps1
 ```
 
-评估集位于 `backend/data/rag-eval.json`，用 `kind + collectionTitle + title` 描述期望命中，输出 top1/top3/top5 命中率和失败案例。后续可以继续扩展为保存历史评估结果、对比不同检索版本和在 CI 中做最低命中率门禁。
+评估集位于 `backend/data/rag-eval.json`，用 `category` 标注主题，并用 `kind + collectionTitle + title` 描述期望命中。输出包含全局 top1/top3/top5 命中率、失败案例和按分类聚合的命中率，便于观察 chunking、embedding、hybrid retrieval、rerank、evaluation 等主题的检索弱项。后续可以继续扩展为保存历史评估结果、对比不同检索版本和在 CI 中做最低命中率门禁。
 
 ### 2. 继续完善资料处理 Pipeline
 
@@ -299,7 +299,7 @@ hybrid-rag-v2 = 关键词召回 + 向量召回 + Rerank 精排
 
 1. 继续补充高质量 RAG 数据。
 2. 用 debug 脚本、Debug API、admin-web Debug 页和 eval 脚本验证检索命中。
-3. 继续扩充 `backend/data/rag-eval.json`。
+3. 继续补充 `backend/data/rag-eval.json` 的分类 case，并按分类观察检索弱项。
 4. 扩展资料导入 Pipeline 的 URL、Word 和 OCR 能力。
 
 中期推进：
