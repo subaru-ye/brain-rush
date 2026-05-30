@@ -161,6 +161,8 @@ POST /api/debug/rag
 
 评估集位于 `backend/data/rag-eval.json`，用 `category` 标注主题，并用 `kind + collectionTitle + title` 描述期望命中。输出包含全局 top1/top3/top5 命中率、失败案例和按分类聚合的命中率，便于观察 chunking、embedding、hybrid retrieval、rerank、evaluation 等主题的检索弱项。后续可以继续扩展为保存历史评估结果、对比不同检索版本和在 CI 中做最低命中率门禁。
 
+在继续调整检索参数之前，应该先确认评估环境的数据完整性。`.\backend\scripts\check-rag-data.ps1` 会把 `backend/data/rag-knowledge.json` 与数据库中的 active collection、document、chunk 和 question 做对比，输出缺失、停用和 document 标题不一致的条目。如果 `documents` 分类突然为 0 或某些期望 chunk 完全搜不到，优先重新导入当前 curated JSON，再复跑 eval；不要把本地数据未同步误判为 RRF、字段权重或同义词的问题。
+
 ### 2. 继续完善资料处理 Pipeline
 
 curated JSON 和本地文件 Pipeline 已支持 document 层级，例如：

@@ -247,6 +247,14 @@ backend/data/rag-eval.json
 输出包含总用例数、top1/top3/top5 命中率、命中数量、失败案例，以及按 `category` 聚合的分类统计，用于判断 chunking、embedding、hybrid retrieval、rerank、evaluation 等主题哪里搜得好、哪里搜得差。评估逻辑复用 `debug_retrieve_curated_context()`，只读数据库，不触发出题或写入。
 - `keywordRank`、`vectorRank` 和 `fusionMethod` 可用于判断排序是否来自关键词、向量或两路共同命中。
 
+如果 eval 出现某个分类异常偏低，尤其是 `documents` 类完全未命中，应该先确认本地数据库是否已经导入当前 `backend/data/rag-knowledge.json`。可以运行：
+
+```powershell
+.\backend\scripts\check-rag-data.ps1
+```
+
+该脚本会对比知识库 JSON 与数据库中的 active collection、document、chunk 和 question，输出缺失、停用和 document 标题不一致的条目。发现缺失后先重新执行 curated 导入，再复跑 eval，避免把数据未同步误判成检索策略问题。
+
 ## 当前限制
 
 - 已支持本地 `.txt`、`.md` 和文本型 `.pdf` 的最小导入 Pipeline，并通过 Redis + RQ 异步执行 admin-web 上传导入任务；暂未支持 Word、网页、截图 OCR、取消任务和真实进度条。
