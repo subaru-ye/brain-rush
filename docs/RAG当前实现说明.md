@@ -1,4 +1,4 @@
-# RAG 当前实现说明
+﻿# RAG 当前实现说明
 
 本文档说明 Brain Rush 当前已经落地的 RAG 能力。它只描述当前真实实现；后续优化方向见 [RAG后续优化与扩展.md](RAG后续优化与扩展.md)。
 
@@ -141,10 +141,10 @@ POST /api/generate-quiz
 当前版本：
 
 ```text
-hybrid-rag-v1.2 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检索 + RRF 融合排序
+hybrid-rag-v1.3 = PostgreSQL FTS + Python 兜底关键词检索 + query 同义词扩展 + pgvector 向量检索 + RRF 融合排序
 ```
 
-关键词检索负责精确词命中，例如 `RAG`、`Embedding`、`Rerank`、`BM25`、`pgvector`、`HNSW`。PostgreSQL 环境会优先使用 Full-Text Search；如果安装了 `pg_jieba`，会使用 `jiebacfg` 做中文分词，否则使用 `simple` FTS，并保留 Python 字段加权 scorer 兜底。向量检索负责语义相似，例如“检索效果怎么优化”可以命中“混合检索”“重排序”“评估指标”等内容。
+关键词检索负责精确词命中，例如 `RAG`、`Embedding`、`Rerank`、`BM25`、`pgvector`、`HNSW`。PostgreSQL 环境会优先使用 Full-Text Search；如果安装了 `pg_jieba`，会使用 `jiebacfg` 做中文分词，否则使用 `simple` FTS。`hybrid-rag-v1.3` 会始终合并 Python 字段加权 scorer 作为兜底，并对常见 RAG 术语做轻量同义词扩展，例如“切块/切分/chunk”“语义搜索/embedding”“精排/rerank”“资料来源/knowledge_documents”。向量检索负责语义相似，例如“检索效果怎么优化”可以命中“混合检索”“重排序”“评估指标”等内容。
 
 关键词分会按字段拆分加权：
 
@@ -153,7 +153,7 @@ hybrid-rag-v1.2 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检�
 | `title` | chunk 标题、题干、知识点，权重最高。 |
 | `tags` | chunk/question tags，权重较高。 |
 | `body` | chunk 正文、题目解释、选项等主体内容。 |
-| `source` | chunk 的 `sourceRef`，用于低权重来源命中。 |
+| `source` | chunk 的 `sourceRef` 以及 document title/source，用于低权重来源命中。 |
 | `collection` | collection 标题、描述和 tags，作为领域辅助信号。 |
 
 ## 出题策略
@@ -178,7 +178,7 @@ hybrid-rag-v1.2 = PostgreSQL FTS 优先的关键词检索 + pgvector 向量检�
 | `sourceType=rag_generated` | 题目由 AI 基于 RAG 检索上下文生成。 |
 | `sourceType=ai_generated` | 未命中 RAG，上游 AI 普通生成。 |
 | `sourceIds` | 命中的题目或知识片段 id，最多保留 10 个。 |
-| `retrievalVersion` | 当前检索版本，例如 `hybrid-rag-v1.2`。 |
+| `retrievalVersion` | 当前检索版本，例如 `hybrid-rag-v1.3`。 |
 
 会话级字段：
 
@@ -221,12 +221,12 @@ POST /api/debug/rag
 
 判断方式：
 
-- 返回 `hybrid-rag-v1.2`：说明本次使用了当前 RAG 检索链路。
+- 返回 `hybrid-rag-v1.3`：说明本次使用了当前 RAG 检索链路。
 - questions 命中较多：可能直接返回精选题，减少 AI 出题调用。
 - chunks 命中较多：AI 补题时会获得更具体的上下文。
 - `vectorScore` 为 0：可能没有配置 embedding，或相关数据没有向量。
 - `keywordScoreBreakdown` 可用于判断命中主要来自标题、tags、正文、来源还是 collection 元数据。
-- `totalScore` 在 `hybrid-rag-v1.2` 中表示 RRF 融合分，不再是关键词分和向量分的直接相加。
+- `totalScore` 在 `hybrid-rag-v1.3` 中表示 RRF 融合分，不再是关键词分和向量分的直接相加。
 
 ## 检索评估
 
@@ -255,3 +255,4 @@ backend/data/rag-eval.json
 - 暂未接入 Rerank；当前数据规模下暂不值得增加复杂度。
 - 已提供后端知识库管理 API、独立 admin-web、导入队列健康检查和检索评估集；暂未实现小程序后台页面。
 - 运行时 AI 生成题不会自动进入精选题库，避免低质量生成结果污染 `question_bank_items`。
+

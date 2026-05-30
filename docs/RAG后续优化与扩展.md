@@ -6,25 +6,26 @@
 
 ## 当前还比较粗糙的地方
 
-### 1. 关键词检索已升级，但中文分词依赖数据库扩展
+### 1. 关键词检索已升级，但仍需继续校准中文召回
 
-当前关键词检索已经升级为 `hybrid-rag-v1.2`：PostgreSQL 环境优先使用 Full-Text Search，安装 `pg_jieba` 时使用 `jiebacfg` 做中文分词；如果扩展不可用，则自动降级到 `simple` FTS 和 Python 字段加权 scorer。
+当前关键词检索已经升级为 `hybrid-rag-v1.3`：PostgreSQL 环境优先使用 Full-Text Search，安装 `pg_jieba` 时使用 `jiebacfg` 做中文分词；如果扩展不可用，则使用 `simple` FTS。同时系统会合并 Python 字段加权 scorer 作为兜底，并对常见 RAG 术语做轻量 query 同义词扩展，例如 chunk/切分/切块、embedding/语义搜索、rerank/重排/精排、knowledge_documents/资料来源。
 
 这已经解决了早期“纯文本包含 + 简单加分”的一部分问题：
 
-- 标题、tags、正文、来源、collection 元数据有了字段权重。
+- 标题、tags、正文、来源、document 来源和 collection 元数据有了字段权重。
 - `debug-rag.ps1` 会输出 `keywordScoreBreakdown`，便于判断命中来源。
 - `RAG`、`BM25`、`pgvector`、`HNSW` 等英文术语和数字类关键词有更稳定的召回。
+- eval 从 `top5=0.3488` 提升到 `top5=0.7907`，主要改善了 indexing、chunking、embeddings、preprocessing、query_enhancement、dedup 等分类。
 
 后续仍需关注：
 
 - 生产数据库是否能稳定安装和维护 `pg_jieba`。
-- `simple` FTS 对中文连续文本仍不如真正中文分词。
+- `simple` FTS 对中文连续文本仍不如真正中文分词，同义词表也需要继续靠 eval 失败案例校准。
 - 当前还不是 BM25，字段权重也需要通过评估集继续校准。
 
 ### 2. 混合检索分数融合已升级为 RRF
 
-`hybrid-rag-v1.2` 已经把混合排序从直接加分升级为 RRF 融合排序。排序逻辑可以简化理解为：
+`hybrid-rag-v1.3` 延续 RRF 融合排序。排序逻辑可以简化理解为：
 
 ```text
 最终分数 = 关键词排序贡献 + 向量排序贡献

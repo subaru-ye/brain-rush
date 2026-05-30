@@ -67,7 +67,11 @@ def run_rag_eval(db: Session, cases: list[dict[str, Any]]) -> EvalSummary:
         limit = int(case.get("limit", 5))
         expected = case.get("expectedMatches", [])
         result = debug_retrieve_curated_context(db, query, limit=max(limit, max(TOP_KS)))
-        matches = [*result.questions, *result.chunks]
+        matches = sorted(
+            [*result.questions, *result.chunks],
+            key=lambda match: match.total_score,
+            reverse=True,
+        )
 
         case_hits = {k: _case_hits(matches, expected, k) for k in TOP_KS}
         for k, is_hit in case_hits.items():

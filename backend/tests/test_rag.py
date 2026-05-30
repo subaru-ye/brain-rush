@@ -141,7 +141,7 @@ def test_generate_quiz_returns_curated_questions_without_ai_call():
 
     assert ai_client.quiz_calls == []
     assert len(response.questions) == 5
-    assert response.retrievalVersion == "hybrid-rag-v1.2"
+    assert response.retrievalVersion == "hybrid-rag-v1.3"
     assert {question.sourceType for question in response.questions} == {"curated_question"}
     assert response.questions[0].id == "q1"
     assert response.questions[0].answerIndexes == [0]
@@ -390,7 +390,7 @@ def test_hybrid_retrieval_uses_vector_matches_without_keyword_overlap():
         embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
     )
 
-    assert context.retrieval_version == "hybrid-rag-v1.2"
+    assert context.retrieval_version == "hybrid-rag-v1.3"
     assert [item.stem for item in context.question_items] == ["Completely different stem"]
 
 
@@ -426,7 +426,7 @@ def test_rrf_fusion_promotes_results_ranked_by_both_keyword_and_vector():
         embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
     )
 
-    assert context.retrieval_version == "hybrid-rag-v1.2"
+    assert context.retrieval_version == "hybrid-rag-v1.3"
     assert [chunk.title for chunk in context.chunks[:2]] == ["Semantic target", "target target target"]
 
 
@@ -468,7 +468,7 @@ def test_debug_retrieval_reports_keyword_and_vector_scores():
         embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
     )
 
-    assert result.retrieval_version == "hybrid-rag-v1.2"
+    assert result.retrieval_version == "hybrid-rag-v1.3"
     assert result.questions[0].title == "RAG debug question"
     assert result.questions[0].keyword_score > 0
     assert result.questions[0].vector_score > 0
@@ -517,7 +517,7 @@ def test_keyword_retrieval_weights_title_and_tags_above_body_only_matches():
         embedding_client=DisabledEmbeddingClient(),
     )
 
-    assert context.retrieval_version == "hybrid-rag-v1.2"
+    assert context.retrieval_version == "hybrid-rag-v1.3"
     assert [chunk.title for chunk in context.chunks[:2]] == ["BM25 scoring", "Search overview"]
 
 
@@ -544,6 +544,101 @@ def test_keyword_retrieval_matches_technical_terms():
     )
 
     assert [chunk.title for chunk in context.chunks] == ["pgvector HNSW settings"]
+
+
+def test_keyword_retrieval_expands_chunk_synonyms():
+    db = build_db()
+    collection = KnowledgeCollection(title="RAG Chunking", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    db.add(
+        KnowledgeChunk(
+            collection_id=collection.id,
+            title="文档切分的作用",
+            content="长文档切分成较小的 chunk 后，检索器可以返回更聚焦的片段。",
+            source_ref="manual",
+            tags_json=["Chunk", "文档切分"],
+        )
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "资料切块为什么有用",
+        embedding_client=DisabledEmbeddingClient(),
+    )
+
+    assert [chunk.title for chunk in context.chunks] == ["文档切分的作用"]
+
+
+def test_keyword_retrieval_matches_mixed_language_synonyms():
+    db = build_db()
+    collection = KnowledgeCollection(title="RAG Rerank", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    db.add(
+        KnowledgeChunk(
+            collection_id=collection.id,
+            title="Rerank的定义与作用",
+            content="Rerank 使用 Cross-Encoder 对初步召回的候选文档进行重排和精排。",
+            source_ref="manual",
+            tags_json=["RAG", "Rerank", "重排"],
+        )
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "精排 cross encoder 怎么提升相关性",
+        embedding_client=DisabledEmbeddingClient(),
+    )
+
+    assert [chunk.title for chunk in context.chunks] == ["Rerank的定义与作用"]
+
+
+def test_keyword_retrieval_uses_document_title_and_source():
+    db = build_db()
+    collection = KnowledgeCollection(title="Documented RAG", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    document = KnowledgeDocument(
+        collection_id=collection.id,
+        title="knowledge_documents handbook",
+        source_type="manual",
+        source_uri="manual:knowledge_documents",
+        metadata_json={},
+        status="active",
+        is_active=True,
+    )
+    db.add(document)
+    db.flush()
+    db.add(
+        KnowledgeChunk(
+            collection_id=collection.id,
+            document_id=document.id,
+            title="Document lineage",
+            content="Chunks should retain source lineage.",
+            source_ref="manual",
+            tags_json=[],
+        )
+    )
+    db.commit()
+
+    result = debug_retrieve_curated_context(
+        db,
+        "资料来源 document_id",
+        embedding_client=DisabledEmbeddingClient(),
+    )
+
+    assert result.chunks[0].title == "Document lineage"
+    assert result.chunks[0].keyword_score_breakdown["source"] > 0
+    assert set(result.chunks[0].keyword_score_breakdown) == {
+        "title",
+        "tags",
+        "body",
+        "source",
+        "collection",
+    }
 
 
 def test_retrieval_ignores_inactive_collections():
@@ -716,3 +811,4 @@ def test_import_curated_payload_regenerates_chunk_embedding_when_document_change
 
     assert stats.embeddings_generated == 1
     assert stats.embeddings_skipped == 0
+

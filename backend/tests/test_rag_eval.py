@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -129,6 +131,51 @@ def test_rag_eval_groups_legacy_cases_as_uncategorized():
     assert summary["categoryOrder"] == ["uncategorized"]
     assert summary["byCategory"]["uncategorized"]["total"] == 1
     assert summary["byCategory"]["uncategorized"]["top5"] == 1.0
+
+
+def test_rag_eval_sorts_question_and_chunk_matches_by_total_score(monkeypatch):
+    def fake_debug_retrieve_curated_context(db, query, limit):
+        return SimpleNamespace(
+            questions=[
+                SimpleNamespace(
+                    kind="question",
+                    collection_title="RAG 知识库",
+                    title="Generic question",
+                    total_score=0.01,
+                )
+            ],
+            chunks=[
+                SimpleNamespace(
+                    kind="chunk",
+                    collection_title="RAG 知识库",
+                    title="Expected chunk",
+                    total_score=0.03,
+                )
+            ],
+        )
+
+    monkeypatch.setattr("app.rag_eval.debug_retrieve_curated_context", fake_debug_retrieve_curated_context)
+
+    summary = run_rag_eval(
+        None,  # type: ignore[arg-type]
+        [
+            {
+                "query": "expected",
+                "category": "chunking",
+                "expectedMatches": [
+                    {
+                        "kind": "chunk",
+                        "collectionTitle": "RAG 知识库",
+                        "title": "Expected chunk",
+                    }
+                ],
+            }
+        ],
+    ).to_dict()
+
+    assert summary["top1"] == 1.0
+    assert summary["byCategory"]["chunking"]["top1"] == 1.0
+    assert summary["failures"] == []
 
 
 def test_rag_eval_handles_empty_cases():

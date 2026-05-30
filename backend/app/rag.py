@@ -16,10 +16,10 @@ from .quiz_answers import format_option_indexes
 from .schemas import QuizQuestion
 
 
-KEYWORD_RETRIEVAL_VERSION = "hybrid-rag-v1.2"
-RETRIEVAL_VERSION = "hybrid-rag-v1.2"
-VECTOR_CANDIDATE_LIMIT = 20
-KEYWORD_CANDIDATE_LIMIT = 20
+KEYWORD_RETRIEVAL_VERSION = "hybrid-rag-v1.3"
+RETRIEVAL_VERSION = "hybrid-rag-v1.3"
+VECTOR_CANDIDATE_LIMIT = 50
+KEYWORD_CANDIDATE_LIMIT = 50
 FUSION_METHOD = "rrf"
 RRF_K = 60
 RRF_KEYWORD_WEIGHT = 1.0
@@ -30,15 +30,88 @@ PYTHON_FIELD_WEIGHTS = {
     "tags": 16.0,
     "body": 8.0,
     "source": 3.0,
-    "collection": 5.0,
+    "collection": 1.5,
 }
 FTS_FIELD_WEIGHTS = {
     "title": 24.0,
     "tags": 20.0,
     "body": 10.0,
     "source": 4.0,
-    "collection": 6.0,
+    "collection": 2.0,
 }
+DOMAIN_SEARCH_TERMS = (
+    "advanced rag",
+    "bi-encoder",
+    "bm25",
+    "chunk",
+    "cosine",
+    "cross-encoder",
+    "document",
+    "document_id",
+    "embedding",
+    "hnsw",
+    "ivfflat",
+    "knowledge_documents",
+    "mrr",
+    "pgvector",
+    "query embedding",
+    "rag",
+    "ragas",
+    "recall",
+    "rerank",
+    "rrf",
+    "top k",
+    "top_k",
+    "上下文窗口",
+    "两阶段",
+    "中英文",
+    "关键词",
+    "关键词检索",
+    "传统rag",
+    "切分",
+    "切块",
+    "切片",
+    "召回",
+    "向量数据库",
+    "向量检索",
+    "同义词",
+    "幻觉",
+    "微调",
+    "文档切分",
+    "文档预处理",
+    "检索增强生成",
+    "检索质量",
+    "混合检索",
+    "生成质量",
+    "精排",
+    "索引阶段",
+    "语义搜索",
+    "语义检索",
+    "资料来源",
+    "重排",
+    "查询增强",
+    "查询扩展",
+    "查询重写",
+    "去重",
+    "评估指标",
+)
+QUERY_SYNONYM_GROUPS = (
+    ("chunk", "切分", "切块", "切片", "分块", "分段", "文档切分"),
+    ("embedding", "语义搜索", "语义检索", "语义相近", "字面不同", "query embedding"),
+    ("rerank", "reranker", "重排", "精排", "cross-encoder", "cross encoder"),
+    ("bi-encoder", "bi encoder", "embedding模型", "embedding 模型"),
+    ("document", "document_id", "knowledge_documents", "资料来源", "来源文档", "文档来源"),
+    ("混合检索", "hybrid", "关键词检索", "bm25", "rrf", "专有名词", "数字"),
+    ("ragas", "自动化评估", "忠实度", "上下文相关性", "答案相关性"),
+    ("recall", "recall@k", "mrr", "命中率", "评估指标", "检索评估"),
+    ("pgvector", "cosine", "ivfflat", "hnsw", "向量索引", "向量数据库"),
+    ("查询增强", "查询重写", "查询扩展", "口语化", "子查询"),
+    ("文档预处理", "数据清洗", "语义切片", "元数据", "一刀切", "固定长度"),
+    ("去重", "重复", "simhash", "minhash", "滑动窗口"),
+    ("幻觉", "可靠性", "来源追踪", "上下文过滤", "回答约束"),
+    ("微调", "模型微调", "知识更新", "私有资料", "私有数据"),
+    ("索引阶段", "查询阶段", "两阶段"),
+)
 
 
 @dataclass
@@ -337,7 +410,22 @@ def _search_terms(query: str) -> list[str]:
     normalized = query.strip().lower()
     terms = [normalized] if normalized else []
     terms.extend(re.findall(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]{2,}", normalized))
+    terms.extend(_domain_terms(normalized))
+    terms = _expand_synonyms(terms, normalized)
     return list(dict.fromkeys(term for term in terms if term))
+
+
+def _domain_terms(normalized_query: str) -> list[str]:
+    return [term for term in DOMAIN_SEARCH_TERMS if term in normalized_query]
+
+
+def _expand_synonyms(terms: list[str], normalized_query: str) -> list[str]:
+    expanded = list(terms)
+    term_set = set(terms)
+    for group in QUERY_SYNONYM_GROUPS:
+        if any(term in normalized_query or term in term_set for term in group):
+            expanded.extend(group)
+    return expanded
 
 
 def _keyword_question_matches(
@@ -353,8 +441,6 @@ def _keyword_question_matches(
         fts_matches, config_name = _postgres_keyword_question_matches(db, items, query)
     except Exception:
         return python_matches
-    if config_name == "jiebacfg" and fts_matches:
-        return fts_matches
     return _merge_keyword_matches(fts_matches, python_matches)
 
 
@@ -371,8 +457,6 @@ def _keyword_chunk_matches(
         fts_matches, config_name = _postgres_keyword_chunk_matches(db, items, query)
     except Exception:
         return python_matches
-    if config_name == "jiebacfg" and fts_matches:
-        return fts_matches
     return _merge_keyword_matches(fts_matches, python_matches)
 
 
@@ -502,7 +586,7 @@ def _postgres_keyword_chunk_matches(
                 ts_rank_cd(to_tsvector(cast(:config_name as regconfig), coalesce(k.title, '')), sq.query_value) as title_rank,
                 ts_rank_cd(to_tsvector(cast(:config_name as regconfig), coalesce(k.tags_json::text, '')), sq.query_value) as tags_rank,
                 ts_rank_cd(to_tsvector(cast(:config_name as regconfig), coalesce(k.content, '')), sq.query_value) as body_rank,
-                ts_rank_cd(to_tsvector(cast(:config_name as regconfig), coalesce(k.source_ref, '')), sq.query_value) as source_rank,
+                ts_rank_cd(to_tsvector(cast(:config_name as regconfig), concat_ws(' ', k.source_ref, d.title, d.source_type, d.source_uri)), sq.query_value) as source_rank,
                 ts_rank_cd(to_tsvector(cast(:config_name as regconfig), concat_ws(' ', c.title, c.description, c.tags_json::text)), sq.query_value) as collection_rank
             from knowledge_chunks k
             join knowledge_collections c on c.id = k.collection_id
@@ -516,7 +600,7 @@ def _postgres_keyword_chunk_matches(
                   setweight(to_tsvector(cast(:config_name as regconfig), coalesce(k.title, '')), 'A') ||
                   setweight(to_tsvector(cast(:config_name as regconfig), coalesce(k.tags_json::text, '')), 'A') ||
                   setweight(to_tsvector(cast(:config_name as regconfig), coalesce(k.content, '')), 'B') ||
-                  setweight(to_tsvector(cast(:config_name as regconfig), coalesce(k.source_ref, '')), 'D')
+                  setweight(to_tsvector(cast(:config_name as regconfig), concat_ws(' ', k.source_ref, d.title, d.source_type, d.source_uri)), 'D')
                 ) @@ sq.query_value
                 or to_tsvector(cast(:config_name as regconfig), concat_ws(' ', c.title, c.description, c.tags_json::text)) @@ sq.query_value
               )
@@ -585,7 +669,18 @@ def _merge_keyword_matches(primary: list[KeywordMatch], fallback: list[KeywordMa
     merged: dict[str, KeywordMatch] = {_id_key(match.item): match for match in primary}
     for match in fallback:
         key = _id_key(match.item)
-        if key not in merged:
+        if key in merged:
+            existing = merged[key]
+            breakdown = {
+                field: existing.breakdown.get(field, 0.0) + match.breakdown.get(field, 0.0)
+                for field in KEYWORD_DEBUG_KEYS
+            }
+            merged[key] = KeywordMatch(
+                score=existing.score + match.score,
+                item=existing.item,
+                breakdown=breakdown,
+            )
+        else:
             merged[key] = match
     return sorted(merged.values(), key=lambda value: value.score, reverse=True)
 
@@ -803,9 +898,26 @@ def _score_chunk(chunk: KnowledgeChunk, terms: list[str], query: str) -> dict[st
             PYTHON_FIELD_WEIGHTS["tags"],
         ),
         "body": _score_field(chunk.content, terms, query, PYTHON_FIELD_WEIGHTS["body"]),
-        "source": _score_field(chunk.source_ref, terms, query, PYTHON_FIELD_WEIGHTS["source"]),
+        "source": _score_field(
+            _chunk_source_text(chunk),
+            terms,
+            query,
+            PYTHON_FIELD_WEIGHTS["source"],
+        ),
         "collection": _score_collection(getattr(chunk, "collection", None), terms, query),
     }
+
+
+def _chunk_source_text(chunk: KnowledgeChunk) -> str:
+    document = getattr(chunk, "document", None)
+    return " ".join(
+        [
+            chunk.source_ref,
+            getattr(document, "title", "") if document else "",
+            getattr(document, "source_type", "") if document else "",
+            getattr(document, "source_uri", "") if document else "",
+        ]
+    )
 
 
 def _score_collection(collection: object | None, terms: list[str], query: str) -> float:
