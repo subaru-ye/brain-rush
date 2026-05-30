@@ -185,6 +185,7 @@ export interface RagDebugResponse {
 export interface RagImportJobItem {
   id: string
   status: string
+  isStale: boolean
   sourceType: string
   sourceUri: string
   fileName: string
@@ -205,6 +206,16 @@ export interface RagImportJobListResponse {
   total: number
   limit: number
   offset: number
+}
+
+export interface RagImportHealthResponse {
+  redisOk: boolean
+  queueName: string
+  queuedCount: number
+  workerCount: number
+  staleQueuedCount: number
+  staleRunningCount: number
+  errorMessage?: string | null
 }
 
 export interface ListFilters {

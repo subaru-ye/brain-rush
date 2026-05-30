@@ -15,6 +15,7 @@ import {
   type RagAdminQuestionUpdateRequest,
   type RagAdminReembedResponse,
   type RagDebugResponse,
+  type RagImportHealthResponse,
   type RagImportJobItem,
   type RagImportJobListResponse
 } from "./types"
@@ -224,6 +225,10 @@ export function listImportJobs(
     token,
     `/api/admin/rag/imports${queryString(params)}`
   )
+}
+
+export function getImportHealth(token: string): Promise<RagImportHealthResponse> {
+  return requestJson<RagImportHealthResponse>(token, "/api/admin/rag/imports/health")
 }
 
 export function uploadImportJob(

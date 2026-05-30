@@ -469,6 +469,7 @@ class RagAdminReembedResponse(BaseModel):
 class RagImportJobItem(BaseModel):
     id: str
     status: str
+    isStale: bool
     sourceType: str
     sourceUri: str
     fileName: str
@@ -489,3 +490,13 @@ class RagImportJobListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class RagImportHealthResponse(BaseModel):
+    redisOk: bool
+    queueName: str
+    queuedCount: int
+    workerCount: int
+    staleQueuedCount: int
+    staleRunningCount: int
+    errorMessage: str | None = None

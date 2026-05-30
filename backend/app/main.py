@@ -49,6 +49,7 @@ from .rag_admin import (
 )
 from .rag_import_jobs import (
     create_upload_import_job,
+    get_import_health,
     get_import_job,
     list_import_jobs,
     retry_import_job,
@@ -69,6 +70,7 @@ from .schemas import (
     QuestionFeedbackResponse,
     RagDebugRequest,
     RagDebugResponse,
+    RagImportHealthResponse,
     RagAdminChunkItem,
     RagAdminChunkListResponse,
     RagAdminChunkUpdateRequest,
@@ -324,6 +326,18 @@ def create_app() -> FastAPI:
         db: Session = Depends(get_db),
     ) -> RagImportJobListResponse:
         return list_import_jobs(db, status=status, limit=limit, offset=offset)
+
+    @app.get(
+        "/api/admin/rag/imports/health",
+        response_model=RagImportHealthResponse,
+        responses={401: {"model": ApiError}, 404: {"model": ApiError}},
+    )
+    async def admin_get_import_health(
+        _: None = Depends(require_admin_token),
+        db: Session = Depends(get_db),
+        runtime_settings: Settings = Depends(get_settings),
+    ) -> RagImportHealthResponse:
+        return get_import_health(db, runtime_settings)
 
     @app.get(
         "/api/admin/rag/imports/{job_id}",

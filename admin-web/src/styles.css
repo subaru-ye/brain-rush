@@ -405,6 +405,32 @@ button:disabled {
   gap: 14px;
 }
 
+.import-health {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #dce5e2;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 14px 16px;
+}
+
+.import-health.unhealthy {
+  border-color: #f0b8b8;
+  background: #fffafa;
+}
+
+.import-health strong {
+  display: block;
+  margin-top: 4px;
+}
+
+.import-health-error {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+}
+
 .import-upload {
   display: grid;
   grid-template-columns: minmax(220px, 1.2fr) minmax(180px, 1fr) minmax(180px, 1fr);
@@ -455,8 +481,23 @@ button:disabled {
   text-align: left;
 }
 
+.row-hint {
+  overflow: hidden;
+  margin: 6px 0 0;
+  color: #9a5b20;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .inspector-status {
   justify-content: flex-start;
+}
+
+.import-hint {
+  background: #fff6e8;
+  color: #8a4f16;
 }
 
 .page-row {
@@ -822,6 +863,14 @@ button:disabled {
 
   .import-upload {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .import-health {
+    grid-template-columns: 1fr;
+  }
+
+  .import-health .summary-strip {
+    justify-content: flex-start;
   }
 
   .import-upload .primary-button {

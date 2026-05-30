@@ -65,6 +65,8 @@ questions: 精选题
 .\backend\scripts\run-rag-worker.ps1
 ```
 
+Imports 页面会展示 Redis 是否可连接、`rag-imports` 队列 waiting job 数量、当前 RQ worker 数量，以及 queued/running stale 任务数量。worker 未启动时任务会停留在 `queued`；Requeue 会重新把任务放回 Redis 队列。Windows 本地脚本使用 `app.rq_worker.WindowsSimpleWorker` 兼容 RQ 的 fork/SIGALRM 问题，Linux 环境默认使用普通 RQ worker。
+
 ## 管理接口
 
 当前已提供后端知识库管理 API。配置 `ADMIN_API_TOKEN` 后，请求 `/api/admin/rag/*` 需要携带：
@@ -80,7 +82,7 @@ X-Admin-Token: 你的管理令牌
 - 启用或停用 collection/document/chunk/question。
 - 编辑 collection 描述和 tags、document source 元数据、chunk 内容/source/tags、question difficulty/tags。
 - 手动重跑 chunk/question embedding。
-- 上传本地资料文件并查看导入任务状态、统计和失败原因。
+- 上传本地资料文件并查看导入任务状态、统计、失败原因、Redis/worker/队列健康状态和 stale 提示。
 
 当前仍不提供删除、完整题目结构编辑、批量上传、URL/Word/OCR 导入和小程序后台页面。
 
@@ -247,9 +249,9 @@ backend/data/rag-eval.json
 
 ## 当前限制
 
-- 已支持本地 `.txt`、`.md` 和文本型 `.pdf` 的最小导入 Pipeline；暂未支持 Word、网页、截图 OCR 和异步导入任务。
+- 已支持本地 `.txt`、`.md` 和文本型 `.pdf` 的最小导入 Pipeline，并通过 Redis + RQ 异步执行 admin-web 上传导入任务；暂未支持 Word、网页、截图 OCR、取消任务和真实进度条。
 - 关键词检索已接入 PostgreSQL Full-Text Search，但中文分词依赖数据库是否安装 `pg_jieba`；未安装时会自动降级到 `simple` FTS 和 Python 兜底打分。
 - 混合排序当前使用 RRF 融合关键词结果和向量结果，避免不同检索器的原始分数尺度互相压制。
 - 暂未接入 Rerank；当前数据规模下暂不值得增加复杂度。
-- 已提供后端知识库管理 API；暂未实现小程序后台页面、文档上传解析、异步导入任务和检索评估集。
+- 已提供后端知识库管理 API、独立 admin-web、导入队列健康检查和检索评估集；暂未实现小程序后台页面。
 - 运行时 AI 生成题不会自动进入精选题库，避免低质量生成结果污染 `question_bank_items`。

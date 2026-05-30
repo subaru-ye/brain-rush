@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react"
 import {
   API_BASE_URL,
   debugRag,
+  getImportHealth,
   listImportJobs,
   listChunks,
   listCollections,
@@ -30,6 +31,7 @@ import {
   type RagAdminQuestionItem,
   type RagDebugMatch,
   type RagDebugResponse,
+  type RagImportHealthResponse,
   type RagImportJobItem
 } from "./types"
 
@@ -106,6 +108,26 @@ function importStatsLabel(item: RagImportJobItem): string {
   return item.errorMessage || "waiting"
 }
 
+function importStatusHint(item: RagImportJobItem, health: RagImportHealthResponse | null): string {
+  const hints: string[] = []
+  if (item.status === "queued" && health?.workerCount === 0) {
+    hints.push("worker 未在线，任务不会被处理")
+  }
+  if (item.status === "queued" && item.isStale) {
+    hints.push("可能需要 Requeue 或检查 worker")
+  }
+  if (item.status === "running" && item.isStale) {
+    hints.push("任务可能卡住，可 Requeue")
+  }
+  if (item.status === "failed" && item.errorMessage) {
+    hints.push(item.errorMessage)
+  }
+  if (item.status === "succeeded") {
+    hints.push(importStatsLabel(item))
+  }
+  return hints.join("；")
+}
+
 export default function App() {
   const [token, setToken] = useState(getStoredAdminToken)
   const [tokenInput, setTokenInput] = useState("")
@@ -116,6 +138,7 @@ export default function App() {
   const [chunks, setChunks] = useState<PageState<RagAdminChunkItem>>(emptyPage)
   const [questions, setQuestions] = useState<PageState<RagAdminQuestionItem>>(emptyPage)
   const [imports, setImports] = useState<PageState<RagImportJobItem>>(emptyPage)
+  const [importHealth, setImportHealth] = useState<RagImportHealthResponse | null>(null)
   const [selectedIds, setSelectedIds] = useState<Record<AdminView, string>>({
     collections: "",
     documents: "",
@@ -156,6 +179,14 @@ export default function App() {
     if (!token) return
     void refresh(activeView, 0)
   }, [token, activeView])
+
+  useEffect(() => {
+    if (!token || activeView !== "imports") return
+    const intervalId = window.setInterval(() => {
+      void refresh("imports")
+    }, 5000)
+    return () => window.clearInterval(intervalId)
+  }, [token, activeView, filters.status, imports.offset])
 
   function handleAuthError(errorValue: unknown) {
     if (errorValue instanceof AdminApiError && errorValue.code === "admin_auth_invalid") {
@@ -228,12 +259,16 @@ export default function App() {
         }
       }
       if (view === "imports") {
-        const response = await listImportJobs(token, {
-          status: filters.status,
-          limit: PAGE_LIMIT,
-          offset: offset ?? imports.offset
-        })
+        const [response, health] = await Promise.all([
+          listImportJobs(token, {
+            status: filters.status,
+            limit: PAGE_LIMIT,
+            offset: offset ?? imports.offset
+          }),
+          getImportHealth(token)
+        ])
         setImports(response)
+        setImportHealth(health)
         if (response.items[0]) {
           setSelectedIds((current) => ({ ...current, imports: response.items[0].id }))
         }
@@ -430,7 +465,8 @@ export default function App() {
       const created = await uploadImportJob(token, payload)
       setImports((page) => ({ ...page, items: [created, ...page.items], total: page.total + 1 }))
       setSelectedIds((current) => ({ ...current, imports: created.id }))
-      setNotice("导入任务已入队，请启动 RQ worker 后刷新查看状态。")
+      setImportHealth(await getImportHealth(token))
+      setNotice("导入任务已入队，Imports 顶部会显示队列和 worker 状态。")
     } catch (errorValue) {
       handleAuthError(errorValue)
     } finally {
@@ -448,6 +484,7 @@ export default function App() {
         ...page,
         items: page.items.map((entry) => (entry.id === updated.id ? updated : entry))
       }))
+      setImportHealth(await getImportHealth(token))
       setNotice("导入任务已重新入队。")
     } catch (errorValue) {
       handleAuthError(errorValue)
@@ -579,6 +616,7 @@ export default function App() {
                 loading={loading}
                 uploading={uploading}
                 saving={saving}
+                health={importHealth}
                 status={filters.status}
                 onStatusChange={(status) => updateFilter("status", status)}
                 onApply={() => void refresh("imports", 0)}
@@ -619,7 +657,12 @@ export default function App() {
               />
             ) : null}
             {activeView === "imports" && selectedImport ? (
-              <ImportInspector item={selectedImport} saving={saving} onRetry={handleRetryImport} />
+              <ImportInspector
+                item={selectedImport}
+                saving={saving}
+                health={importHealth}
+                onRetry={handleRetryImport}
+              />
             ) : null}
             {activeView === "debug" ? (
               <DebugInspector />
@@ -899,6 +942,7 @@ function ImportWorkspace({
   loading,
   uploading,
   saving,
+  health,
   status,
   onStatusChange,
   onApply,
@@ -913,6 +957,7 @@ function ImportWorkspace({
   loading: boolean
   uploading: boolean
   saving: boolean
+  health: RagImportHealthResponse | null
   status: string
   onStatusChange: (status: string) => void
   onApply: () => void
@@ -968,6 +1013,7 @@ function ImportWorkspace({
 
   return (
     <div className="imports-workspace">
+      <ImportHealthPanel health={health} />
       <form className="import-upload" onSubmit={(event) => void submitUpload(event)}>
         <label className="field">
           <span>File</span>
@@ -1036,10 +1082,54 @@ function ImportWorkspace({
         selectedId={selectedId}
         loading={loading}
         saving={saving}
+        health={health}
         onSelect={onSelect}
         onRetry={onRetry}
         onPage={onPage}
       />
+    </div>
+  )
+}
+
+function ImportHealthPanel({ health }: { health: RagImportHealthResponse | null }) {
+  if (!health) {
+    return (
+      <div className="import-health">
+        <div>
+          <p className="eyebrow">Import health</p>
+          <strong>等待健康检查</strong>
+        </div>
+        <div className="summary-strip">
+          <span>Redis -</span>
+          <span>waiting -</span>
+          <span>workers -</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={health.redisOk ? "import-health" : "import-health unhealthy"}>
+      <div>
+        <p className="eyebrow">Import health</p>
+        <strong>{health.redisOk ? "导入队列正常" : "导入队列异常"}</strong>
+      </div>
+      <div className="summary-strip">
+        <span className={health.redisOk ? "pill pill-green" : "pill pill-red"}>
+          Redis {health.redisOk ? "正常" : "异常"}
+        </span>
+        <span>waiting {health.queuedCount}</span>
+        <span>workers {health.workerCount}</span>
+        <span className={health.staleQueuedCount ? "pill pill-red" : "pill pill-muted"}>
+          stale queued {health.staleQueuedCount}
+        </span>
+        <span className={health.staleRunningCount ? "pill pill-red" : "pill pill-muted"}>
+          stale running {health.staleRunningCount}
+        </span>
+      </div>
+      {!health.redisOk && health.errorMessage ? (
+        <div className="alert error import-health-error">{health.errorMessage}</div>
+      ) : null}
     </div>
   )
 }
@@ -1049,6 +1139,7 @@ function ImportList({
   selectedId,
   loading,
   saving,
+  health,
   onSelect,
   onRetry,
   onPage
@@ -1057,6 +1148,7 @@ function ImportList({
   selectedId?: string
   loading: boolean
   saving: boolean
+  health: RagImportHealthResponse | null
   onSelect: (id: string) => void
   onRetry: (item: RagImportJobItem) => Promise<void>
   onPage: (offset: number) => void
@@ -1072,10 +1164,14 @@ function ImportList({
                 <div>
                   <strong>{item.fileName}</strong>
                   <span>{item.collectionTitle} · {item.documentTitle || "默认标题"}</span>
+                  {importStatusHint(item, health) ? (
+                    <p className="row-hint">{importStatusHint(item, health)}</p>
+                  ) : null}
                 </div>
                 <div className="row-meta">
                   <span className={jobStatusTone(item.status)}>{item.status}</span>
                   <span>{importStatsLabel(item)}</span>
+                  {item.isStale ? <span className="pill pill-red">stale</span> : null}
                   <span>{formatDate(item.createdAt)}</span>
                 </div>
               </button>
@@ -1510,17 +1606,22 @@ function InspectorFrame({
 function ImportInspector({
   item,
   saving,
+  health,
   onRetry
 }: {
   item: RagImportJobItem
   saving: boolean
+  health: RagImportHealthResponse | null
   onRetry: (item: RagImportJobItem) => Promise<void>
 }) {
+  const hint = importStatusHint(item, health)
   return (
     <InspectorFrame title={item.fileName} eyebrow="Import job">
       <div className="summary-strip inspector-status">
         <span className={jobStatusTone(item.status)}>{item.status}</span>
+        {item.isStale ? <span className="pill pill-red">stale</span> : null}
       </div>
+      {hint ? <div className="alert import-hint">{hint}</div> : null}
       <Readonly label="ID" value={item.id} />
       <Readonly label="Queue job" value={item.queueJobId || "-"} />
       <Readonly label="Collection" value={item.collectionTitle} />

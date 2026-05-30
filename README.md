@@ -9,7 +9,7 @@ Brain Rush 是一个 AI 闯关学习微信小程序。用户输入学习主题�
 - 小程序学习闭环：输入主题 -> 生成题目 -> 闯关答题 -> 复盘报告 -> 历史记录。
 - 用户沉淀：微信静默身份、历史详情、错题本、题目质量反馈。
 - RAG：精选题优先返回；不足时基于知识片段让 AI 补题。
-- 知识库管理：独立 `admin-web`，支持查看、筛选、启停、轻量编辑、reembed、Debug 和 Imports 上传导入。
+- 知识库管理：独立 `admin-web`，支持查看、筛选、启停、轻量编辑、reembed、Debug、Imports 上传导入和导入队列健康状态查看。
 - 数据库：PostgreSQL + Alembic + pgvector。
 
 ## 日常启动
@@ -63,6 +63,8 @@ http://127.0.0.1:8000
 ```
 
 Imports 支持上传 `.txt`、`.md` 和文本型 `.pdf`。
+Imports 页面会显示 Redis、`rag-imports` 队列、worker 和 stale 任务状态。worker 未启动时任务会停留在 `queued`，可以启动 worker 后等待处理，或使用 Requeue 重新把任务放回 Redis 队列。
+Windows 本地脚本会使用 `app.rq_worker.WindowsSimpleWorker` 兼容 RQ 的 fork/SIGALRM 问题；Linux 环境默认使用普通 RQ worker。
 
 ## 第一次配置
 

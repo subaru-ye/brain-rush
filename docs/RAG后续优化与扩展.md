@@ -82,7 +82,7 @@ document 下的 chunk 会写入 `document_id`，旧格式 collection 直属 chun
 
 ### 6. 已有 Redis + RQ 异步导入任务，仍需增强任务治理
 
-当前 `admin-web` 上传导入会创建 `rag_import_jobs` 记录，并交给 Redis + RQ worker 执行 document pipeline。任务会记录 queued/running/succeeded/failed 状态、导入统计和失败原因，failed 任务可以手动 retry。
+当前 `admin-web` 上传导入会创建 `rag_import_jobs` 记录，并交给 Redis + RQ worker 执行 document pipeline。任务会记录 queued/running/succeeded/failed 状态、导入统计和失败原因，failed 或长时间未处理的任务可以手动 Requeue。Imports 页面已经展示 Redis、`rag-imports` 队列、worker 数量和 stale 任务数量；worker 未启动时任务会停留在 `queued`。Windows 本地 worker 使用 `app.rq_worker.WindowsSimpleWorker`，Linux 环境默认使用普通 RQ worker。
 
 后续仍可继续增强：
 

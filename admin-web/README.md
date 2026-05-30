@@ -24,10 +24,12 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 .\backend\scripts\run-rag-worker.ps1
 ```
 
+Imports 页面顶部会显示 Redis 是否可连接、`rag-imports` 队列 waiting job 数量、worker 数量和 stale 任务数量。worker 未启动时任务会停留在 `queued`；Requeue 会重新把任务放回 Redis 队列。Windows 本地脚本会使用 `app.rq_worker.WindowsSimpleWorker`，Linux 环境默认使用普通 RQ worker。
+
 ## 当前范围
 
 - 支持 Collections、Documents、Chunks、Questions 的列表、搜索、筛选和允许字段编辑。
 - 支持 chunk/question 手动 reembed。
-- 支持 Imports 上传 `.txt`、`.md`、文本型 `.pdf`，查看导入任务状态、统计、失败原因，并重试 failed 任务。
+- 支持 Imports 上传 `.txt`、`.md`、文本型 `.pdf`，查看 Redis/worker/队列健康状态、导入任务状态、统计、失败原因和 stale 提示，并 Requeue 未成功任务。
 - 支持 Debug 查询 RAG 检索命中详情。
 - 不支持删除、批量上传、URL/Word/OCR 导入或新的权限体系。

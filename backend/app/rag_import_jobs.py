@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from fastapi import UploadFile
 from sqlalchemy import func, select
@@ -11,12 +12,14 @@ from .database import SessionLocal
 from .document_pipeline import import_document_file_with_stats
 from .errors import ApiHttpError
 from .models import RagImportJob, new_id, now_utc
-from .schemas import RagImportJobItem, RagImportJobListResponse
+from .schemas import RagImportHealthResponse, RagImportJobItem, RagImportJobListResponse
 
 
 RAG_IMPORT_QUEUE_NAME = "rag-imports"
 ALLOWED_UPLOAD_EXTENSIONS = {".txt", ".md", ".pdf"}
 RAG_IMPORT_STATUSES = {"queued", "running", "succeeded", "failed"}
+STALE_QUEUED_AFTER = timedelta(minutes=10)
+STALE_RUNNING_AFTER = timedelta(minutes=30)
 
 
 async def create_upload_import_job(
@@ -107,6 +110,49 @@ def get_import_job(db: Session, job_id: str) -> RagImportJobItem:
     return _job_item(_get_job(db, job_id))
 
 
+def get_import_health(db: Session, settings: Settings) -> RagImportHealthResponse:
+    stale_queued_count = _stale_queued_count(db)
+    stale_running_count = _stale_running_count(db)
+
+    try:
+        from redis import Redis
+        from rq import Queue, Worker
+    except ImportError as exc:
+        return RagImportHealthResponse(
+            redisOk=False,
+            queueName=RAG_IMPORT_QUEUE_NAME,
+            queuedCount=0,
+            workerCount=0,
+            staleQueuedCount=stale_queued_count,
+            staleRunningCount=stale_running_count,
+            errorMessage=str(exc),
+        )
+
+    try:
+        redis = Redis.from_url(settings.redis_url)
+        redis.ping()
+        queue = Queue(RAG_IMPORT_QUEUE_NAME, connection=redis)
+        return RagImportHealthResponse(
+            redisOk=True,
+            queueName=RAG_IMPORT_QUEUE_NAME,
+            queuedCount=int(queue.count),
+            workerCount=int(Worker.count(connection=redis, queue=queue)),
+            staleQueuedCount=stale_queued_count,
+            staleRunningCount=stale_running_count,
+            errorMessage=None,
+        )
+    except Exception as exc:
+        return RagImportHealthResponse(
+            redisOk=False,
+            queueName=RAG_IMPORT_QUEUE_NAME,
+            queuedCount=0,
+            workerCount=0,
+            staleQueuedCount=stale_queued_count,
+            staleRunningCount=stale_running_count,
+            errorMessage=str(exc),
+        )
+
+
 def retry_import_job(db: Session, job_id: str, settings: Settings) -> RagImportJobItem:
     job = _get_job(db, job_id)
     if job.status == "succeeded":
@@ -181,10 +227,62 @@ def _get_job(db: Session, job_id: str) -> RagImportJob:
     return job
 
 
+def _stale_queued_cutoff():
+    return now_utc() - STALE_QUEUED_AFTER
+
+
+def _stale_running_cutoff():
+    return now_utc() - STALE_RUNNING_AFTER
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _stale_queued_count(db: Session) -> int:
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(RagImportJob)
+            .where(
+                RagImportJob.status == "queued",
+                RagImportJob.created_at < _stale_queued_cutoff(),
+            )
+        )
+        or 0
+    )
+
+
+def _stale_running_count(db: Session) -> int:
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(RagImportJob)
+            .where(
+                RagImportJob.status == "running",
+                RagImportJob.started_at.is_not(None),
+                RagImportJob.started_at < _stale_running_cutoff(),
+            )
+        )
+        or 0
+    )
+
+
+def _is_stale_job(job: RagImportJob) -> bool:
+    if job.status == "queued":
+        return _as_utc(job.created_at) < _stale_queued_cutoff()
+    if job.status == "running" and job.started_at:
+        return _as_utc(job.started_at) < _stale_running_cutoff()
+    return False
+
+
 def _job_item(job: RagImportJob) -> RagImportJobItem:
     return RagImportJobItem(
         id=str(job.id),
         status=job.status,
+        isStale=_is_stale_job(job),
         sourceType=job.source_type,
         sourceUri=job.source_uri,
         fileName=job.file_name,
