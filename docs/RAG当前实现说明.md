@@ -141,10 +141,10 @@ POST /api/generate-quiz
 当前版本：
 
 ```text
-hybrid-rag-v1.3 = PostgreSQL FTS + Python 兜底关键词检索 + query 同义词扩展 + pgvector 向量检索 + RRF 融合排序
+hybrid-rag-v1.4 = PostgreSQL FTS + Python 兜底关键词检索 + query 短语/同义词扩展 + 泛词降权 + pgvector 向量检索 + RRF 融合排序
 ```
 
-关键词检索负责精确词命中，例如 `RAG`、`Embedding`、`Rerank`、`BM25`、`pgvector`、`HNSW`。PostgreSQL 环境会优先使用 Full-Text Search；如果安装了 `pg_jieba`，会使用 `jiebacfg` 做中文分词，否则使用 `simple` FTS。`hybrid-rag-v1.3` 会始终合并 Python 字段加权 scorer 作为兜底，并对常见 RAG 术语做轻量同义词扩展，例如“切块/切分/chunk”“语义搜索/embedding”“精排/rerank”“资料来源/knowledge_documents”。向量检索负责语义相似，例如“检索效果怎么优化”可以命中“混合检索”“重排序”“评估指标”等内容。
+关键词检索负责精确词命中，例如 `RAG`、`Embedding`、`Rerank`、`BM25`、`pgvector`、`HNSW`。PostgreSQL 环境会优先使用 Full-Text Search；如果安装了 `pg_jieba`，会使用 `jiebacfg` 做中文分词，否则使用 `simple` FTS。`hybrid-rag-v1.4` 会始终合并 Python 字段加权 scorer 作为兜底，并对常见 RAG 术语做轻量同义词扩展，例如“切块/切分/chunk”“语义搜索/embedding”“精排/rerank”“资料来源/knowledge_documents”。v1.4 还增加了小型中文领域短语规则，例如“外部知识”“原文和元数据”“检索效果差”“最终答案掩盖检索问题”“局限性怎么缓解”，并对 `RAG`、`为什么`、`是什么` 等泛词降权，减少公共词把无关内容顶到前面。向量检索负责语义相似，例如“检索效果怎么优化”可以命中“混合检索”“重排序”“评估指标”等内容。
 
 关键词分会按字段拆分加权：
 
@@ -178,7 +178,7 @@ hybrid-rag-v1.3 = PostgreSQL FTS + Python 兜底关键词检索 + query 同义�
 | `sourceType=rag_generated` | 题目由 AI 基于 RAG 检索上下文生成。 |
 | `sourceType=ai_generated` | 未命中 RAG，上游 AI 普通生成。 |
 | `sourceIds` | 命中的题目或知识片段 id，最多保留 10 个。 |
-| `retrievalVersion` | 当前检索版本，例如 `hybrid-rag-v1.3`。 |
+| `retrievalVersion` | 当前检索版本，例如 `hybrid-rag-v1.4`。 |
 
 会话级字段：
 
@@ -221,12 +221,12 @@ POST /api/debug/rag
 
 判断方式：
 
-- 返回 `hybrid-rag-v1.3`：说明本次使用了当前 RAG 检索链路。
+- 返回 `hybrid-rag-v1.4`：说明本次使用了当前 RAG 检索链路。
 - questions 命中较多：可能直接返回精选题，减少 AI 出题调用。
 - chunks 命中较多：AI 补题时会获得更具体的上下文。
 - `vectorScore` 为 0：可能没有配置 embedding，或相关数据没有向量。
 - `keywordScoreBreakdown` 可用于判断命中主要来自标题、tags、正文、来源还是 collection 元数据。
-- `totalScore` 在 `hybrid-rag-v1.3` 中表示 RRF 融合分，不再是关键词分和向量分的直接相加。
+- `totalScore` 在 `hybrid-rag-v1.4` 中表示 RRF 融合分，不再是关键词分和向量分的直接相加。
 
 ## 检索评估
 

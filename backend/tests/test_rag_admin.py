@@ -162,7 +162,7 @@ def test_rag_debug_api_allows_development_without_token():
     assert response.status_code == 200
     payload = response.json()
     assert payload["query"] == "RAG management"
-    assert payload["retrievalVersion"] == "hybrid-rag-v1.3"
+    assert payload["retrievalVersion"] == "hybrid-rag-v1.4"
     assert payload["chunks"][0]["title"] == "Admin chunk"
     assert "keywordScoreBreakdown" in payload["chunks"][0]
 

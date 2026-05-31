@@ -141,7 +141,7 @@ def test_generate_quiz_returns_curated_questions_without_ai_call():
 
     assert ai_client.quiz_calls == []
     assert len(response.questions) == 5
-    assert response.retrievalVersion == "hybrid-rag-v1.3"
+    assert response.retrievalVersion == "hybrid-rag-v1.4"
     assert {question.sourceType for question in response.questions} == {"curated_question"}
     assert response.questions[0].id == "q1"
     assert response.questions[0].answerIndexes == [0]
@@ -390,7 +390,7 @@ def test_hybrid_retrieval_uses_vector_matches_without_keyword_overlap():
         embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
     )
 
-    assert context.retrieval_version == "hybrid-rag-v1.3"
+    assert context.retrieval_version == "hybrid-rag-v1.4"
     assert [item.stem for item in context.question_items] == ["Completely different stem"]
 
 
@@ -426,7 +426,7 @@ def test_rrf_fusion_promotes_results_ranked_by_both_keyword_and_vector():
         embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
     )
 
-    assert context.retrieval_version == "hybrid-rag-v1.3"
+    assert context.retrieval_version == "hybrid-rag-v1.4"
     assert [chunk.title for chunk in context.chunks[:2]] == ["Semantic target", "target target target"]
 
 
@@ -468,7 +468,7 @@ def test_debug_retrieval_reports_keyword_and_vector_scores():
         embedding_client=FakeEmbeddingClient(query_vector=make_vector(0)),
     )
 
-    assert result.retrieval_version == "hybrid-rag-v1.3"
+    assert result.retrieval_version == "hybrid-rag-v1.4"
     assert result.questions[0].title == "RAG debug question"
     assert result.questions[0].keyword_score > 0
     assert result.questions[0].vector_score > 0
@@ -517,7 +517,7 @@ def test_keyword_retrieval_weights_title_and_tags_above_body_only_matches():
         embedding_client=DisabledEmbeddingClient(),
     )
 
-    assert context.retrieval_version == "hybrid-rag-v1.3"
+    assert context.retrieval_version == "hybrid-rag-v1.4"
     assert [chunk.title for chunk in context.chunks[:2]] == ["BM25 scoring", "Search overview"]
 
 
@@ -594,6 +594,149 @@ def test_keyword_retrieval_matches_mixed_language_synonyms():
     )
 
     assert [chunk.title for chunk in context.chunks] == ["Rerank的定义与作用"]
+
+
+def test_keyword_retrieval_expands_final_answer_evaluation_phrase():
+    db = build_db()
+    collection = KnowledgeCollection(title="RAG Evaluation", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    db.add(
+        KnowledgeChunk(
+            collection_id=collection.id,
+            title="RAG 评估的两个层面",
+            content="RAG 评估需要同时看检索质量和生成质量，只看最终答案会掩盖检索阶段问题。",
+            source_ref="manual",
+            tags_json=["RAG评估", "检索质量", "生成质量"],
+        )
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "为什么只看最终答案会掩盖检索阶段问题",
+        embedding_client=DisabledEmbeddingClient(),
+    )
+
+    assert [chunk.title for chunk in context.chunks] == ["RAG 评估的两个层面"]
+
+
+def test_keyword_retrieval_keeps_vector_database_metadata_ahead_of_pgvector_terms():
+    db = build_db()
+    collection = KnowledgeCollection(title="Vector DB", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    db.add_all(
+        [
+            KnowledgeChunk(
+                collection_id=collection.id,
+                title="向量数据库在 RAG 中的角色",
+                content="向量数据库通常还需要保存原文、来源、标签、是否启用等元数据，便于过滤和生成时引用。",
+                source_ref="manual",
+                tags_json=["向量数据库", "元数据"],
+            ),
+            KnowledgeChunk(
+                collection_id=collection.id,
+                title="pgvector 的距离与索引",
+                content="pgvector 支持 cosine distance、IVFFlat 和 HNSW 索引。",
+                source_ref="manual",
+                tags_json=["pgvector", "HNSW", "cosine"],
+            ),
+        ]
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "向量数据库为什么还要保存原文和元数据",
+        embedding_client=DisabledEmbeddingClient(),
+    )
+
+    assert context.chunks[0].title == "向量数据库在 RAG 中的角色"
+
+
+def test_keyword_retrieval_expands_retrieval_optimization_phrase():
+    db = build_db()
+    collection = KnowledgeCollection(title="RAG Optimization", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    db.add(
+        KnowledgeChunk(
+            collection_id=collection.id,
+            title="RAG检索效果优化核心环节",
+            content="RAG检索效果差通常出在文档切片、查询理解、检索策略三个核心环节。",
+            source_ref="manual",
+            tags_json=["RAG", "检索优化", "核心环节"],
+        )
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "RAG 检索效果差通常要优化哪些环节",
+        embedding_client=DisabledEmbeddingClient(),
+    )
+
+    assert [chunk.title for chunk in context.chunks] == ["RAG检索效果优化核心环节"]
+
+
+def test_keyword_retrieval_expands_pure_vector_retrieval_phrase():
+    db = build_db()
+    collection = KnowledgeCollection(title="Hybrid RAG", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    db.add_all(
+        [
+            KnowledgeChunk(
+                collection_id=collection.id,
+                title="关键词检索与向量检索的互补性",
+                content="关键词检索和向量检索可以互相补充。",
+                source_ref="manual",
+                tags_json=["混合检索", "向量检索"],
+            ),
+            KnowledgeChunk(
+                collection_id=collection.id,
+                title="混合检索与重排序优化",
+                content="解决纯向量检索对专有名词、代码片段、数字召回率低的问题，采用向量检索+BM25关键词检索组合，通过RRF算法融合排序。",
+                source_ref="manual",
+                tags_json=["RAG", "混合检索", "重排序"],
+            ),
+        ]
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "为什么纯向量检索对专有名词和数字不稳定",
+        embedding_client=DisabledEmbeddingClient(),
+    )
+
+    assert context.chunks[0].title == "混合检索与重排序优化"
+
+
+def test_keyword_retrieval_expands_reliability_limitations_phrase():
+    db = build_db()
+    collection = KnowledgeCollection(title="RAG Reliability", source_type="curated", tags_json=[])
+    db.add(collection)
+    db.flush()
+    db.add(
+        KnowledgeChunk(
+            collection_id=collection.id,
+            title="RAG的局限性与解决方案",
+            content="RAG 的局限性包括检索质量、上下文窗口和实时性问题，可通过 Rerank、Top-K 截断、摘要压缩和定期更新缓解。",
+            source_ref="manual",
+            tags_json=["RAG", "局限性", "解决方案"],
+        )
+    )
+    db.commit()
+
+    context = retrieve_curated_context_with_client(
+        db,
+        "RAG 有哪些局限性，怎么缓解",
+        embedding_client=DisabledEmbeddingClient(),
+    )
+
+    assert [chunk.title for chunk in context.chunks] == ["RAG的局限性与解决方案"]
 
 
 def test_keyword_retrieval_uses_document_title_and_source():

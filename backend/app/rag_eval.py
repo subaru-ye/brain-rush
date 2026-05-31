@@ -89,6 +89,9 @@ def run_rag_eval(db: Session, cases: list[dict[str, Any]]) -> EvalSummary:
                         "collectionTitle": match.collection_title,
                         "title": match.title,
                         "totalScore": round(match.total_score, 4),
+                        "keywordRank": getattr(match, "keyword_rank", None),
+                        "vectorRank": getattr(match, "vector_rank", None),
+                        "fusionMethod": getattr(match, "fusion_method", None),
                     }
                     for match in matches[:5]
                 ],

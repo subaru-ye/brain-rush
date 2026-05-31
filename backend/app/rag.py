@@ -16,8 +16,8 @@ from .quiz_answers import format_option_indexes
 from .schemas import QuizQuestion
 
 
-KEYWORD_RETRIEVAL_VERSION = "hybrid-rag-v1.3"
-RETRIEVAL_VERSION = "hybrid-rag-v1.3"
+KEYWORD_RETRIEVAL_VERSION = "hybrid-rag-v1.4"
+RETRIEVAL_VERSION = "hybrid-rag-v1.4"
 VECTOR_CANDIDATE_LIMIT = 50
 KEYWORD_CANDIDATE_LIMIT = 50
 FUSION_METHOD = "rrf"
@@ -104,14 +104,62 @@ QUERY_SYNONYM_GROUPS = (
     ("混合检索", "hybrid", "关键词检索", "bm25", "rrf", "专有名词", "数字"),
     ("ragas", "自动化评估", "忠实度", "上下文相关性", "答案相关性"),
     ("recall", "recall@k", "mrr", "命中率", "评估指标", "检索评估"),
-    ("pgvector", "cosine", "ivfflat", "hnsw", "向量索引", "向量数据库"),
+    ("pgvector", "cosine", "ivfflat", "hnsw", "向量索引"),
+    ("向量数据库", "原文", "元数据", "metadata", "来源", "标签", "过滤"),
     ("查询增强", "查询重写", "查询扩展", "口语化", "子查询"),
-    ("文档预处理", "数据清洗", "语义切片", "元数据", "一刀切", "固定长度"),
+    ("文档预处理", "数据清洗", "语义切片", "一刀切", "固定长度"),
     ("去重", "重复", "simhash", "minhash", "滑动窗口"),
     ("幻觉", "可靠性", "来源追踪", "上下文过滤", "回答约束"),
     ("微调", "模型微调", "知识更新", "私有资料", "私有数据"),
     ("索引阶段", "查询阶段", "两阶段"),
 )
+QUERY_PHRASE_RULES = (
+    (
+        ("外部知识",),
+        ("外部知识", "知识库", "检索增强生成", "基本定义", "可更新知识", "企业知识库"),
+    ),
+    (
+        ("原文", "元数据"),
+        ("向量数据库", "保存原文", "原文", "元数据", "来源", "标签", "过滤", "生成时引用"),
+    ),
+    (
+        ("检索效果差",),
+        ("检索效果优化", "核心环节", "文档切片", "查询理解", "检索策略", "查询增强", "混合检索"),
+    ),
+    (
+        ("纯向量检索",),
+        ("纯向量检索", "专有名词", "数字", "召回率低", "bm25关键词检索", "rrf算法", "重排序优化"),
+    ),
+    (
+        ("最终答案", "掩盖"),
+        ("最终答案", "检索阶段", "检索质量", "生成质量", "只看最终答案", "掩盖检索"),
+    ),
+    (
+        ("局限性", "缓解"),
+        ("局限性", "解决方案", "检索质量", "上下文窗口", "实时性", "top-k", "摘要压缩"),
+    ),
+    (
+        ("百万级", "hnsw"),
+        ("向量检索调参", "百万级", "索引类型", "hnsw", "ivfflat", "top_k", "相似度阈值"),
+    ),
+    (
+        ("重排", "什么时候"),
+        ("重排", "初步召回", "候选内容", "最终拼接", "上下文", "相关性"),
+    ),
+)
+LOW_VALUE_TERM_MULTIPLIERS = {
+    "rag": 0.12,
+    "为什么": 0.2,
+    "是什么": 0.2,
+    "什么": 0.2,
+    "怎么": 0.2,
+    "哪些": 0.2,
+    "时候": 0.2,
+    "通常": 0.3,
+    "可以": 0.2,
+    "需要": 0.25,
+    "问题": 0.35,
+}
 
 
 @dataclass
@@ -410,9 +458,18 @@ def _search_terms(query: str) -> list[str]:
     normalized = query.strip().lower()
     terms = [normalized] if normalized else []
     terms.extend(re.findall(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]{2,}", normalized))
+    terms.extend(_phrase_terms(normalized))
     terms.extend(_domain_terms(normalized))
     terms = _expand_synonyms(terms, normalized)
     return list(dict.fromkeys(term for term in terms if term))
+
+
+def _phrase_terms(normalized_query: str) -> list[str]:
+    terms: list[str] = []
+    for triggers, expansions in QUERY_PHRASE_RULES:
+        if all(trigger in normalized_query for trigger in triggers):
+            terms.extend(expansions)
+    return terms
 
 
 def _domain_terms(normalized_query: str) -> list[str]:
@@ -957,7 +1014,17 @@ def _score_term(target: str, term: str, weight: float) -> float:
         return 0.0
     exact_multiplier = 0.8 if re.search(rf"(?<![a-zA-Z0-9_]){re.escape(term)}(?![a-zA-Z0-9_])", target) else 0.45
     short_term_boost = 1.2 if re.fullmatch(r"[a-zA-Z0-9_]{2,8}", term) else 1.0
-    return weight * exact_multiplier * short_term_boost * (1 + (occurrence_count - 1) * 0.25)
+    return (
+        weight
+        * exact_multiplier
+        * short_term_boost
+        * _term_value_multiplier(term)
+        * (1 + (occurrence_count - 1) * 0.25)
+    )
+
+
+def _term_value_multiplier(term: str) -> float:
+    return LOW_VALUE_TERM_MULTIPLIERS.get(term, 1.0)
 
 
 def _empty_keyword_breakdown() -> dict[str, float]:

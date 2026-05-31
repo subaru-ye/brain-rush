@@ -100,6 +100,9 @@ def test_rag_eval_reports_failures_with_actual_matches():
     assert summary["top5"] == 0.0
     assert summary["failures"][0]["category"] == "fundamentals"
     assert summary["failures"][0]["actualMatches"][0]["title"] == "RAG 的基本定义"
+    assert "keywordRank" in summary["failures"][0]["actualMatches"][0]
+    assert "vectorRank" in summary["failures"][0]["actualMatches"][0]
+    assert "fusionMethod" in summary["failures"][0]["actualMatches"][0]
     assert summary["byCategory"]["fundamentals"]["top5"] == 0.0
     assert summary["byCategory"]["fundamentals"]["failures"][0]["category"] == "fundamentals"
     assert (
