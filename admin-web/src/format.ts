@@ -27,9 +27,9 @@ export function tagsText(tags: string[]): string {
 }
 
 export function activeLabel(isActive: boolean): string {
-  return isActive ? "Active" : "Inactive"
+  return isActive ? "启用" : "停用"
 }
 
 export function embeddingLabel(embeddedAt?: string | null): string {
-  return embeddedAt ? "Embedded" : "Missing"
+  return embeddedAt ? "已向量化" : "未向量化"
 }

@@ -38,12 +38,12 @@ import {
 const PAGE_LIMIT = 50
 
 const views: Array<{ id: AdminView; label: string; description: string }> = [
-  { id: "collections", label: "Collections", description: "知识库集合" },
-  { id: "documents", label: "Documents", description: "资料来源" },
-  { id: "chunks", label: "Chunks", description: "知识片段" },
-  { id: "questions", label: "Questions", description: "精选题" },
-  { id: "imports", label: "Imports", description: "导入任务" },
-  { id: "debug", label: "Debug", description: "检索调试" }
+  { id: "collections", label: "知识库", description: "集合与范围" },
+  { id: "documents", label: "资料", description: "来源文档" },
+  { id: "chunks", label: "片段", description: "检索内容" },
+  { id: "questions", label: "题库", description: "精选题目" },
+  { id: "imports", label: "导入", description: "任务与队列" },
+  { id: "debug", label: "调试", description: "检索命中" }
 ]
 
 const emptyFilters: ListFilters = {
@@ -94,6 +94,50 @@ function jobStatusTone(status: string): string {
   return "pill pill-muted"
 }
 
+function jobStatusLabel(status: string): string {
+  if (status === "queued") return "等待中"
+  if (status === "running") return "导入中"
+  if (status === "succeeded") return "已完成"
+  if (status === "failed") return "失败"
+  return status
+}
+
+function documentStatusLabel(status: string): string {
+  if (status === "ready") return "已就绪"
+  if (status === "imported") return "已导入"
+  if (status === "failed") return "失败"
+  return status
+}
+
+function sourceTypeLabel(sourceType: string): string {
+  if (sourceType === "curated_json") return "精选 JSON"
+  if (sourceType === "local_file") return "本地文件"
+  if (sourceType === "import_upload") return "上传文件"
+  return sourceType
+}
+
+function questionTypeLabel(questionType: string): string {
+  if (questionType === "single_choice") return "单选"
+  if (questionType === "multiple_choice") return "多选"
+  if (questionType === "true_false") return "判断"
+  return questionType
+}
+
+function matchKindLabel(kind: string): string {
+  if (kind === "chunk") return "片段"
+  if (kind === "question") return "题目"
+  return kind
+}
+
+function breakdownLabel(key: string): string {
+  if (key === "title") return "标题"
+  if (key === "tags") return "标签"
+  if (key === "body") return "正文"
+  if (key === "source") return "来源"
+  if (key === "collection") return "知识库"
+  return key
+}
+
 function textPreview(value: string, length = 120): string {
   if (value.length <= length) return value
   return `${value.slice(0, length)}...`
@@ -103,9 +147,9 @@ function importStatsLabel(item: RagImportJobItem): string {
   const total = item.stats.total_imported
   const generated = item.stats.embeddings_generated
   if (typeof total === "number") {
-    return `${total} chunks · ${typeof generated === "number" ? generated : 0} embeddings`
+    return `${total} 个片段 · ${typeof generated === "number" ? generated : 0} 个向量`
   }
-  return item.errorMessage || "waiting"
+  return item.errorMessage || "等待处理"
 }
 
 function importStatusHint(item: RagImportJobItem, health: RagImportHealthResponse | null): string {
@@ -114,10 +158,10 @@ function importStatusHint(item: RagImportJobItem, health: RagImportHealthRespons
     hints.push("worker 未在线，任务不会被处理")
   }
   if (item.status === "queued" && item.isStale) {
-    hints.push("可能需要 Requeue 或检查 worker")
+    hints.push("可能需要重新入队或检查 worker")
   }
   if (item.status === "running" && item.isStale) {
-    hints.push("任务可能卡住，可 Requeue")
+    hints.push("任务可能卡住，可重新入队")
   }
   if (item.status === "failed" && item.errorMessage) {
     hints.push(item.errorMessage)
@@ -323,7 +367,7 @@ export default function App() {
         isActive: draft.isActive
       })
       setCollections((items) => items.map((entry) => (entry.id === updated.id ? updated : entry)))
-      setNotice("Collection 已保存。")
+      setNotice("知识库已保存。")
     } catch (errorValue) {
       handleAuthError(errorValue)
     } finally {
@@ -339,7 +383,7 @@ export default function App() {
       try {
         metadata = JSON.parse(draft.metadata) as Record<string, unknown>
       } catch {
-        setError("Metadata 不是合法 JSON。")
+        setError("元数据不是合法 JSON。")
         return
       }
       const updated = await updateDocument(token, item.id, {
@@ -353,7 +397,7 @@ export default function App() {
         ...page,
         items: page.items.map((entry) => (entry.id === updated.id ? updated : entry))
       }))
-      setNotice("Document 已保存。")
+      setNotice("资料已保存。")
     } catch (errorValue) {
       handleAuthError(errorValue)
     } finally {
@@ -376,7 +420,7 @@ export default function App() {
         ...page,
         items: page.items.map((entry) => (entry.id === updated.id ? updated : entry))
       }))
-      setNotice("Chunk 已保存，embedding 元数据已按后端规则处理。")
+      setNotice("片段已保存，向量元数据已更新。")
     } catch (errorValue) {
       handleAuthError(errorValue)
     } finally {
@@ -397,7 +441,7 @@ export default function App() {
         ...page,
         items: page.items.map((entry) => (entry.id === updated.id ? updated : entry))
       }))
-      setNotice("Question 已保存，embedding 元数据已按后端规则处理。")
+      setNotice("题目已保存，向量元数据已更新。")
     } catch (errorValue) {
       handleAuthError(errorValue)
     } finally {
@@ -420,7 +464,7 @@ export default function App() {
           embeddedAt: result.embeddedAt
         } : entry)
       }))
-      setNotice("Chunk embedding 已重跑。")
+      setNotice("片段向量已重跑。")
     } catch (errorValue) {
       handleAuthError(errorValue)
     } finally {
@@ -443,7 +487,7 @@ export default function App() {
           embeddedAt: result.embeddedAt
         } : entry)
       }))
-      setNotice("Question embedding 已重跑。")
+      setNotice("题目向量已重跑。")
     } catch (errorValue) {
       handleAuthError(errorValue)
     } finally {
@@ -466,7 +510,7 @@ export default function App() {
       setImports((page) => ({ ...page, items: [created, ...page.items], total: page.total + 1 }))
       setSelectedIds((current) => ({ ...current, imports: created.id }))
       setImportHealth(await getImportHealth(token))
-      setNotice("导入任务已入队，Imports 顶部会显示队列和 worker 状态。")
+      setNotice("导入任务已入队，顶部会显示队列和 worker 状态。")
     } catch (errorValue) {
       handleAuthError(errorValue)
     } finally {
@@ -499,8 +543,8 @@ export default function App() {
         <form className="token-panel" onSubmit={submitToken}>
           <div>
             <p className="eyebrow">Brain Rush Admin</p>
-            <h1>RAG 知识库管理</h1>
-            <p className="muted">输入后端配置的 ADMIN_API_TOKEN，进入内部管理工作台。</p>
+            <h1>知识库后台</h1>
+            <p className="muted">输入后端配置的 ADMIN_API_TOKEN，进入管理页面。</p>
           </div>
           <label className="field">
             <span>Admin Token</span>
@@ -513,7 +557,7 @@ export default function App() {
             />
           </label>
           {error ? <div className="alert error">{error}</div> : null}
-          <button type="submit" className="primary-button">进入管理端</button>
+          <button type="submit" className="primary-button">进入后台</button>
           <p className="small-muted">API: {API_BASE_URL}</p>
         </form>
       </main>
@@ -526,8 +570,8 @@ export default function App() {
         <div className="brand-block">
           <span className="brand-mark">BR</span>
           <div>
-            <strong>RAG Admin</strong>
-            <span>Knowledge Ops</span>
+            <strong>知识库后台</strong>
+            <span>RAG 管理</span>
           </div>
         </div>
         <nav className="nav-list">
@@ -548,7 +592,7 @@ export default function App() {
       <section className="workspace">
         <header className="toolbar">
           <div>
-            <p className="eyebrow">API</p>
+            <p className="eyebrow">接口</p>
             <strong>{API_BASE_URL}</strong>
           </div>
           <div className="toolbar-actions">
@@ -705,10 +749,10 @@ function ViewHeader({
         <p>{config.description}</p>
       </div>
       <div className="summary-strip">
-        <span>{collections.length} collections</span>
-        <span>{view === "chunks" ? documents.length : totals.documents} documents</span>
-        <span>{totals.chunks} chunks</span>
-        <span>{totals.questions} questions</span>
+        <span>{collections.length} 个知识库</span>
+        <span>{view === "chunks" ? documents.length : totals.documents} 份资料</span>
+        <span>{totals.chunks} 个片段</span>
+        <span>{totals.questions} 道题</span>
       </div>
     </div>
   )
@@ -732,14 +776,14 @@ function FilterBar({
   return (
     <div className="filter-bar">
       <select value={filters.collectionId} onChange={(event) => onChange("collectionId", event.target.value)}>
-        <option value="">All collections</option>
+        <option value="">全部知识库</option>
         {collections.map((item) => (
           <option key={item.id} value={item.id}>{item.title}</option>
         ))}
       </select>
       {view === "chunks" ? (
         <select value={filters.documentId} onChange={(event) => onChange("documentId", event.target.value)}>
-          <option value="">All documents</option>
+          <option value="">全部资料</option>
           {documents.map((item) => (
             <option key={item.id} value={item.id}>{item.title}</option>
           ))}
@@ -748,19 +792,19 @@ function FilterBar({
       {view === "documents" ? (
         <input
           value={filters.status}
-          placeholder="status"
+          placeholder="状态"
           onChange={(event) => onChange("status", event.target.value)}
         />
       ) : null}
       <select value={filters.isActive} onChange={(event) => onChange("isActive", event.target.value as ListFilters["isActive"])}>
-        <option value="all">All active states</option>
-        <option value="true">Active</option>
-        <option value="false">Inactive</option>
+        <option value="all">全部状态</option>
+        <option value="true">启用</option>
+        <option value="false">停用</option>
       </select>
       <input
         className="search-input"
         value={filters.q}
-        placeholder="Search title, content, source..."
+        placeholder="搜索标题、正文、来源"
         onChange={(event) => onChange("q", event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") onApply()
@@ -780,7 +824,7 @@ function CollectionList({
   selectedId?: string
   onSelect: (id: string) => void
 }) {
-  if (!items.length) return <EmptyList label="暂无 collections" />
+  if (!items.length) return <EmptyList label="暂无知识库" />
   return (
     <div className="row-list">
       {items.map((item) => (
@@ -792,13 +836,13 @@ function CollectionList({
         >
           <div>
             <strong>{item.title}</strong>
-            <span>{item.description || "No description"}</span>
+            <span>{item.description || "暂无说明"}</span>
           </div>
           <div className="row-meta">
             <span className={statusTone(item.isActive)}>{activeLabel(item.isActive)}</span>
-            <span>{item.documentCount} docs</span>
-            <span>{item.chunkCount} chunks</span>
-            <span>{item.questionCount} questions</span>
+            <span>{item.documentCount} 份资料</span>
+            <span>{item.chunkCount} 个片段</span>
+            <span>{item.questionCount} 道题</span>
           </div>
         </button>
       ))}
@@ -822,7 +866,7 @@ function DocumentList({
   return (
     <>
       <PagedHeader page={page} loading={loading} onPage={onPage} />
-      {!page.items.length ? <EmptyList label="暂无 documents" /> : (
+      {!page.items.length ? <EmptyList label="暂无资料" /> : (
         <div className="row-list">
           {page.items.map((item) => (
             <button
@@ -833,12 +877,12 @@ function DocumentList({
             >
               <div>
                 <strong>{item.title}</strong>
-                <span>{item.sourceType} · {item.sourceUri || "No source URI"}</span>
+                <span>{sourceTypeLabel(item.sourceType)} · {item.sourceUri || "暂无来源"}</span>
               </div>
               <div className="row-meta">
                 <span className={statusTone(item.isActive)}>{activeLabel(item.isActive)}</span>
-                <span>{item.status}</span>
-                <span>{item.chunkCount} chunks</span>
+                <span>{documentStatusLabel(item.status)}</span>
+                <span>{item.chunkCount} 个片段</span>
                 <span>{formatDate(item.updatedAt)}</span>
               </div>
             </button>
@@ -865,7 +909,7 @@ function ChunkList({
   return (
     <>
       <PagedHeader page={page} loading={loading} onPage={onPage} />
-      {!page.items.length ? <EmptyList label="暂无 chunks" /> : (
+      {!page.items.length ? <EmptyList label="暂无片段" /> : (
         <div className="row-list">
           {page.items.map((item) => (
             <button
@@ -880,7 +924,7 @@ function ChunkList({
               </div>
               <div className="row-meta">
                 <span className={statusTone(item.isActive)}>{activeLabel(item.isActive)}</span>
-                <span>{item.documentTitle || "Legacy chunk"}</span>
+                <span>{item.documentTitle || "旧格式片段"}</span>
                 <span>{embeddingLabel(item.embeddedAt)}</span>
                 <span>{formatDate(item.createdAt)}</span>
               </div>
@@ -908,7 +952,7 @@ function QuestionList({
   return (
     <>
       <PagedHeader page={page} loading={loading} onPage={onPage} />
-      {!page.items.length ? <EmptyList label="暂无 questions" /> : (
+      {!page.items.length ? <EmptyList label="暂无题目" /> : (
         <div className="row-list">
           {page.items.map((item) => (
             <button
@@ -923,7 +967,7 @@ function QuestionList({
               </div>
               <div className="row-meta">
                 <span className={statusTone(item.isActive)}>{activeLabel(item.isActive)}</span>
-                <span>{item.questionType}</span>
+                <span>{questionTypeLabel(item.questionType)}</span>
                 <span>{item.difficulty}</span>
                 <span>{embeddingLabel(item.embeddedAt)}</span>
               </div>
@@ -992,11 +1036,11 @@ function ImportWorkspace({
       return
     }
     if (!collectionTitle.trim()) {
-      setLocalError("请选择或填写 collection。")
+      setLocalError("请选择或填写知识库。")
       return
     }
     if (chunkOverlap >= chunkSize) {
-      setLocalError("Chunk overlap 必须小于 chunk size。")
+      setLocalError("重叠长度必须小于切片长度。")
       return
     }
     setLocalError("")
@@ -1016,7 +1060,7 @@ function ImportWorkspace({
       <ImportHealthPanel health={health} />
       <form className="import-upload" onSubmit={(event) => void submitUpload(event)}>
         <label className="field">
-          <span>File</span>
+          <span>文件</span>
           <input
             type="file"
             accept=".txt,.md,.pdf"
@@ -1024,7 +1068,7 @@ function ImportWorkspace({
           />
         </label>
         <label className="field">
-          <span>Collection</span>
+          <span>知识库</span>
           <input
             list="collection-title-options"
             value={collectionTitle}
@@ -1035,7 +1079,7 @@ function ImportWorkspace({
           </datalist>
         </label>
         <label className="field">
-          <span>Title</span>
+          <span>资料标题</span>
           <input
             value={title}
             placeholder="默认使用文件名"
@@ -1043,7 +1087,7 @@ function ImportWorkspace({
           />
         </label>
         <label className="field compact-field">
-          <span>Size</span>
+          <span>切片长度</span>
           <input
             type="number"
             min={200}
@@ -1053,7 +1097,7 @@ function ImportWorkspace({
           />
         </label>
         <label className="field compact-field">
-          <span>Overlap</span>
+          <span>重叠</span>
           <input
             type="number"
             min={0}
@@ -1069,11 +1113,11 @@ function ImportWorkspace({
       {localError ? <div className="alert error">{localError}</div> : null}
       <div className="import-filter">
         <select value={status} onChange={(event) => onStatusChange(event.target.value)}>
-          <option value="">All statuses</option>
-          <option value="queued">queued</option>
-          <option value="running">running</option>
-          <option value="succeeded">succeeded</option>
-          <option value="failed">failed</option>
+          <option value="">全部任务</option>
+          <option value="queued">等待中</option>
+          <option value="running">导入中</option>
+          <option value="succeeded">已完成</option>
+          <option value="failed">失败</option>
         </select>
         <button type="button" className="primary-button compact" onClick={onApply}>应用筛选</button>
       </div>
@@ -1096,13 +1140,13 @@ function ImportHealthPanel({ health }: { health: RagImportHealthResponse | null 
     return (
       <div className="import-health">
         <div>
-          <p className="eyebrow">Import health</p>
+          <p className="eyebrow">导入状态</p>
           <strong>等待健康检查</strong>
         </div>
         <div className="summary-strip">
           <span>Redis -</span>
-          <span>waiting -</span>
-          <span>workers -</span>
+          <span>等待 -</span>
+          <span>Worker -</span>
         </div>
       </div>
     )
@@ -1111,20 +1155,20 @@ function ImportHealthPanel({ health }: { health: RagImportHealthResponse | null 
   return (
     <div className={health.redisOk ? "import-health" : "import-health unhealthy"}>
       <div>
-        <p className="eyebrow">Import health</p>
+        <p className="eyebrow">导入状态</p>
         <strong>{health.redisOk ? "导入队列正常" : "导入队列异常"}</strong>
       </div>
       <div className="summary-strip">
         <span className={health.redisOk ? "pill pill-green" : "pill pill-red"}>
           Redis {health.redisOk ? "正常" : "异常"}
         </span>
-        <span>waiting {health.queuedCount}</span>
-        <span>workers {health.workerCount}</span>
+        <span>等待 {health.queuedCount}</span>
+        <span>Worker {health.workerCount}</span>
         <span className={health.staleQueuedCount ? "pill pill-red" : "pill pill-muted"}>
-          stale queued {health.staleQueuedCount}
+          队列超时 {health.staleQueuedCount}
         </span>
         <span className={health.staleRunningCount ? "pill pill-red" : "pill pill-muted"}>
-          stale running {health.staleRunningCount}
+          运行超时 {health.staleRunningCount}
         </span>
       </div>
       {!health.redisOk && health.errorMessage ? (
@@ -1156,7 +1200,7 @@ function ImportList({
   return (
     <>
       <PagedHeader page={page} loading={loading} onPage={onPage} />
-      {!page.items.length ? <EmptyList label="暂无 import jobs" /> : (
+      {!page.items.length ? <EmptyList label="暂无导入任务" /> : (
         <div className="row-list">
           {page.items.map((item) => (
             <div key={item.id} className={selectedId === item.id ? "data-row import-row selected" : "data-row import-row"}>
@@ -1169,9 +1213,9 @@ function ImportList({
                   ) : null}
                 </div>
                 <div className="row-meta">
-                  <span className={jobStatusTone(item.status)}>{item.status}</span>
+                  <span className={jobStatusTone(item.status)}>{jobStatusLabel(item.status)}</span>
                   <span>{importStatsLabel(item)}</span>
-                  {item.isStale ? <span className="pill pill-red">stale</span> : null}
+                  {item.isStale ? <span className="pill pill-red">超时</span> : null}
                   <span>{formatDate(item.createdAt)}</span>
                 </div>
               </button>
@@ -1182,7 +1226,7 @@ function ImportList({
                   disabled={saving}
                   onClick={() => void onRetry(item)}
                 >
-                  {item.status === "failed" ? "Retry" : "Requeue"}
+                  {item.status === "failed" ? "重试" : "重新入队"}
                 </button>
               ) : null}
             </div>
@@ -1231,7 +1275,7 @@ function DebugPanel({
     <div className="debug-workspace">
       <form className="debug-query" onSubmit={(event) => void runDebug(event)}>
         <label className="field">
-          <span>Query</span>
+          <span>查询</span>
           <textarea
             rows={3}
             value={query}
@@ -1240,7 +1284,7 @@ function DebugPanel({
           />
         </label>
         <label className="field compact-field">
-          <span>Limit</span>
+          <span>数量</span>
           <input
             type="number"
             min={1}
@@ -1250,7 +1294,7 @@ function DebugPanel({
           />
         </label>
         <button className="primary-button" type="submit" disabled={loading}>
-          {loading ? "检索中..." : "运行 Debug"}
+          {loading ? "检索中..." : "运行调试"}
         </button>
       </form>
 
@@ -1260,19 +1304,19 @@ function DebugPanel({
         <div className="debug-results">
           <div className="debug-result-head">
             <div>
-              <p className="eyebrow">Retrieval</p>
+              <p className="eyebrow">检索版本</p>
               <h2>{result.retrievalVersion}</h2>
             </div>
             <div className="summary-strip">
-              <span>{result.questions.length} questions</span>
-              <span>{result.chunks.length} chunks</span>
+              <span>{result.questions.length} 道题</span>
+              <span>{result.chunks.length} 个片段</span>
             </div>
           </div>
-          <DebugMatchSection title="Questions" items={result.questions} />
-          <DebugMatchSection title="Chunks" items={result.chunks} />
+          <DebugMatchSection title="题目命中" items={result.questions} />
+          <DebugMatchSection title="片段命中" items={result.chunks} />
         </div>
       ) : (
-        <div className="empty-list">输入 query 后运行 Debug，查看 RAG 命中详情。</div>
+        <div className="empty-list">输入查询后运行调试，查看 RAG 命中详情。</div>
       )}
     </div>
   )
@@ -1283,7 +1327,7 @@ function DebugMatchSection({ title, items }: { title: string; items: RagDebugMat
     <section className="debug-section">
       <div className="debug-section-title">
         <h3>{title}</h3>
-        <span>{items.length} matches</span>
+        <span>{items.length} 条命中</span>
       </div>
       {!items.length ? <div className="empty-list compact-empty">暂无命中</div> : null}
       <div className="debug-match-list">
@@ -1291,18 +1335,18 @@ function DebugMatchSection({ title, items }: { title: string; items: RagDebugMat
           <article key={`${item.kind}_${item.id}`} className="debug-match">
             <div className="debug-match-main">
               <div>
-                <p className="eyebrow">{item.kind} · {item.collectionTitle}</p>
+                <p className="eyebrow">{matchKindLabel(item.kind)} · {item.collectionTitle}</p>
                 <h4>{item.title}</h4>
               </div>
               <div className="score-grid">
-                <Metric label="Keyword" value={item.keywordScore} />
-                <Metric label="Vector" value={item.vectorScore} />
-                <Metric label="Total" value={item.totalScore} />
+                <Metric label="关键词" value={item.keywordScore} />
+                <Metric label="向量" value={item.vectorScore} />
+                <Metric label="总分" value={item.totalScore} />
               </div>
             </div>
             <div className="row-meta debug-meta">
-              <span>keywordRank {item.keywordRank ?? "-"}</span>
-              <span>vectorRank {item.vectorRank ?? "-"}</span>
+              <span>关键词排名 {item.keywordRank ?? "-"}</span>
+              <span>向量排名 {item.vectorRank ?? "-"}</span>
               <span>{item.fusionMethod}</span>
               {item.sourceRef ? <span>{item.sourceRef}</span> : null}
             </div>
@@ -1326,7 +1370,7 @@ function BreakdownBars({ breakdown }: { breakdown: RagDebugMatch["keywordScoreBr
     <div className="breakdown-grid">
       {entries.map(([key, value]) => (
         <div key={key} className="breakdown-row">
-          <span>{key}</span>
+          <span>{breakdownLabel(key)}</span>
           <div>
             <i style={{ width: `${Math.max(3, (value / max) * 100)}%` }} />
           </div>
@@ -1350,7 +1394,7 @@ function PagedHeader<T>({
   const end = Math.min(page.offset + page.items.length, page.total)
   return (
     <div className="page-row">
-      <span>{loading ? "Loading..." : `${start}-${end} / ${page.total}`}</span>
+      <span>{loading ? "加载中..." : `${start}-${end} / ${page.total}`}</span>
       <div>
         <button
           type="button"
@@ -1399,19 +1443,19 @@ function CollectionInspector({
   }, [item])
 
   return (
-    <InspectorFrame title={item.title} eyebrow="Collection">
+    <InspectorFrame title={item.title} eyebrow="知识库">
       <Readonly label="ID" value={item.id} />
-      <Readonly label="Source type" value={item.sourceType} />
+      <Readonly label="来源类型" value={sourceTypeLabel(item.sourceType)} />
       <div className="metric-grid">
-        <Metric label="Documents" value={item.documentCount} />
-        <Metric label="Chunks" value={item.chunkCount} />
-        <Metric label="Questions" value={item.questionCount} />
+        <Metric label="资料" value={item.documentCount} />
+        <Metric label="片段" value={item.chunkCount} />
+        <Metric label="题目" value={item.questionCount} />
       </div>
-      <TextareaField label="Description" value={draft.description} onChange={(value) => setDraft({ ...draft, description: value })} />
-      <TextField label="Tags" value={draft.tags} onChange={(value) => setDraft({ ...draft, tags: value })} />
-      <ToggleField label="Active" checked={draft.isActive} onChange={(value) => setDraft({ ...draft, isActive: value })} />
+      <TextareaField label="说明" value={draft.description} onChange={(value) => setDraft({ ...draft, description: value })} />
+      <TextField label="标签" value={draft.tags} onChange={(value) => setDraft({ ...draft, tags: value })} />
+      <ToggleField label="启用" checked={draft.isActive} onChange={(value) => setDraft({ ...draft, isActive: value })} />
       <button className="primary-button" type="button" disabled={saving} onClick={() => void onSave(item, draft)}>
-        {saving ? "保存中..." : "保存 Collection"}
+        {saving ? "保存中..." : "保存知识库"}
       </button>
     </InspectorFrame>
   )
@@ -1453,17 +1497,17 @@ function DocumentInspector({
   }, [item])
 
   return (
-    <InspectorFrame title={item.title} eyebrow="Document">
-      <Readonly label="Collection" value={item.collectionTitle} />
-      <Readonly label="Source type" value={item.sourceType} />
-      <Readonly label="Content hash" value={item.contentHash || "-"} />
-      <TextField label="Title" value={draft.title} onChange={(value) => setDraft({ ...draft, title: value })} />
-      <TextField label="Source URI" value={draft.sourceUri} onChange={(value) => setDraft({ ...draft, sourceUri: value })} />
-      <TextField label="Status" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value })} />
-      <TextareaField label="Metadata JSON" rows={10} value={draft.metadata} onChange={(value) => setDraft({ ...draft, metadata: value })} />
-      <ToggleField label="Active" checked={draft.isActive} onChange={(value) => setDraft({ ...draft, isActive: value })} />
+    <InspectorFrame title={item.title} eyebrow="资料">
+      <Readonly label="知识库" value={item.collectionTitle} />
+      <Readonly label="来源类型" value={sourceTypeLabel(item.sourceType)} />
+      <Readonly label="内容哈希" value={item.contentHash || "-"} />
+      <TextField label="标题" value={draft.title} onChange={(value) => setDraft({ ...draft, title: value })} />
+      <TextField label="来源 URI" value={draft.sourceUri} onChange={(value) => setDraft({ ...draft, sourceUri: value })} />
+      <TextField label="状态" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value })} />
+      <TextareaField label="元数据 JSON" rows={10} value={draft.metadata} onChange={(value) => setDraft({ ...draft, metadata: value })} />
+      <ToggleField label="启用" checked={draft.isActive} onChange={(value) => setDraft({ ...draft, isActive: value })} />
       <button className="primary-button" type="button" disabled={saving} onClick={() => void onSave(item, draft)}>
-        {saving ? "保存中..." : "保存 Document"}
+        {saving ? "保存中..." : "保存资料"}
       </button>
     </InspectorFrame>
   )
@@ -1509,21 +1553,21 @@ function ChunkInspector({
   }, [item])
 
   return (
-    <InspectorFrame title={item.title} eyebrow="Chunk">
-      <Readonly label="Collection" value={item.collectionTitle} />
-      <Readonly label="Document" value={item.documentTitle || "Legacy chunk"} />
+    <InspectorFrame title={item.title} eyebrow="片段">
+      <Readonly label="知识库" value={item.collectionTitle} />
+      <Readonly label="资料" value={item.documentTitle || "旧格式片段"} />
       <EmbeddingBlock model={item.embeddingModel} version={item.embeddingVersion} hash={item.contentHash} embeddedAt={item.embeddedAt} />
-      <TextField label="Title" value={draft.title} onChange={(value) => setDraft({ ...draft, title: value })} />
-      <TextField label="Source ref" value={draft.sourceRef} onChange={(value) => setDraft({ ...draft, sourceRef: value })} />
-      <TextField label="Tags" value={draft.tags} onChange={(value) => setDraft({ ...draft, tags: value })} />
-      <TextareaField label="Content" rows={14} value={draft.content} onChange={(value) => setDraft({ ...draft, content: value })} />
-      <ToggleField label="Active" checked={draft.isActive} onChange={(value) => setDraft({ ...draft, isActive: value })} />
+      <TextField label="标题" value={draft.title} onChange={(value) => setDraft({ ...draft, title: value })} />
+      <TextField label="来源" value={draft.sourceRef} onChange={(value) => setDraft({ ...draft, sourceRef: value })} />
+      <TextField label="标签" value={draft.tags} onChange={(value) => setDraft({ ...draft, tags: value })} />
+      <TextareaField label="正文" rows={14} value={draft.content} onChange={(value) => setDraft({ ...draft, content: value })} />
+      <ToggleField label="启用" checked={draft.isActive} onChange={(value) => setDraft({ ...draft, isActive: value })} />
       <div className="action-row">
         <button className="primary-button" type="button" disabled={saving} onClick={() => void onSave(item, draft)}>
-          {saving ? "保存中..." : "保存 Chunk"}
+          {saving ? "保存中..." : "保存片段"}
         </button>
         <button className="ghost-button" type="button" disabled={reembedding} onClick={() => void onReembed(item)}>
-          {reembedding ? "重跑中..." : "Reembed"}
+          {reembedding ? "重跑中..." : "重跑向量"}
         </button>
       </div>
     </InspectorFrame>
@@ -1560,23 +1604,23 @@ function QuestionInspector({
   }, [item])
 
   return (
-    <InspectorFrame title={item.knowledgePoint} eyebrow="Question">
-      <Readonly label="Collection" value={item.collectionTitle} />
-      <Readonly label="Question type" value={item.questionType} />
-      <Readonly label="Stem" value={item.stem} multiline />
-      <Readonly label="Options" value={item.options.map((option, index) => `${index}. ${option}`).join("\n")} multiline />
-      <Readonly label="Answers" value={item.answerIndexes.join(", ")} />
-      <Readonly label="Explanation" value={item.explanation} multiline />
+    <InspectorFrame title={item.knowledgePoint} eyebrow="题目">
+      <Readonly label="知识库" value={item.collectionTitle} />
+      <Readonly label="题型" value={questionTypeLabel(item.questionType)} />
+      <Readonly label="题干" value={item.stem} multiline />
+      <Readonly label="选项" value={item.options.map((option, index) => `${index}. ${option}`).join("\n")} multiline />
+      <Readonly label="答案" value={item.answerIndexes.join(", ")} />
+      <Readonly label="解析" value={item.explanation} multiline />
       <EmbeddingBlock model={item.embeddingModel} version={item.embeddingVersion} hash={item.contentHash} embeddedAt={item.embeddedAt} />
-      <TextField label="Difficulty" value={draft.difficulty} onChange={(value) => setDraft({ ...draft, difficulty: value })} />
-      <TextField label="Tags" value={draft.tags} onChange={(value) => setDraft({ ...draft, tags: value })} />
-      <ToggleField label="Active" checked={draft.isActive} onChange={(value) => setDraft({ ...draft, isActive: value })} />
+      <TextField label="难度" value={draft.difficulty} onChange={(value) => setDraft({ ...draft, difficulty: value })} />
+      <TextField label="标签" value={draft.tags} onChange={(value) => setDraft({ ...draft, tags: value })} />
+      <ToggleField label="启用" checked={draft.isActive} onChange={(value) => setDraft({ ...draft, isActive: value })} />
       <div className="action-row">
         <button className="primary-button" type="button" disabled={saving} onClick={() => void onSave(item, draft)}>
-          {saving ? "保存中..." : "保存 Question"}
+          {saving ? "保存中..." : "保存题目"}
         </button>
         <button className="ghost-button" type="button" disabled={reembedding} onClick={() => void onReembed(item)}>
-          {reembedding ? "重跑中..." : "Reembed"}
+          {reembedding ? "重跑中..." : "重跑向量"}
         </button>
       </div>
     </InspectorFrame>
@@ -1616,29 +1660,29 @@ function ImportInspector({
 }) {
   const hint = importStatusHint(item, health)
   return (
-    <InspectorFrame title={item.fileName} eyebrow="Import job">
+    <InspectorFrame title={item.fileName} eyebrow="导入任务">
       <div className="summary-strip inspector-status">
-        <span className={jobStatusTone(item.status)}>{item.status}</span>
-        {item.isStale ? <span className="pill pill-red">stale</span> : null}
+        <span className={jobStatusTone(item.status)}>{jobStatusLabel(item.status)}</span>
+        {item.isStale ? <span className="pill pill-red">超时</span> : null}
       </div>
       {hint ? <div className="alert import-hint">{hint}</div> : null}
       <Readonly label="ID" value={item.id} />
-      <Readonly label="Queue job" value={item.queueJobId || "-"} />
-      <Readonly label="Collection" value={item.collectionTitle} />
-      <Readonly label="Document title" value={item.documentTitle || "-"} />
-      <Readonly label="Source URI" value={item.sourceUri || "-"} multiline />
+      <Readonly label="队列任务" value={item.queueJobId || "-"} />
+      <Readonly label="知识库" value={item.collectionTitle} />
+      <Readonly label="资料标题" value={item.documentTitle || "-"} />
+      <Readonly label="来源 URI" value={item.sourceUri || "-"} multiline />
       <div className="metric-grid">
-        <Metric label="Chunk size" value={item.chunkSize} />
-        <Metric label="Overlap" value={item.chunkOverlap} />
+        <Metric label="切片长度" value={item.chunkSize} />
+        <Metric label="重叠" value={item.chunkOverlap} />
       </div>
-      <Readonly label="Stats" value={JSON.stringify(item.stats, null, 2)} multiline />
-      {item.errorMessage ? <Readonly label="Error" value={item.errorMessage} multiline /> : null}
-      <Readonly label="Created" value={formatDate(item.createdAt)} />
-      <Readonly label="Started" value={formatDate(item.startedAt)} />
-      <Readonly label="Finished" value={formatDate(item.finishedAt)} />
+      <Readonly label="统计" value={JSON.stringify(item.stats, null, 2)} multiline />
+      {item.errorMessage ? <Readonly label="错误" value={item.errorMessage} multiline /> : null}
+      <Readonly label="创建时间" value={formatDate(item.createdAt)} />
+      <Readonly label="开始时间" value={formatDate(item.startedAt)} />
+      <Readonly label="结束时间" value={formatDate(item.finishedAt)} />
       {item.status !== "succeeded" ? (
         <button className="primary-button" type="button" disabled={saving} onClick={() => void onRetry(item)}>
-          {saving ? "入队中..." : item.status === "failed" ? "Retry Import" : "Requeue Import"}
+          {saving ? "入队中..." : item.status === "failed" ? "重试导入" : "重新入队"}
         </button>
       ) : null}
     </InspectorFrame>
@@ -1658,7 +1702,7 @@ function DebugInspector() {
   return (
     <div className="empty-inspector">
       <h2>检索调试</h2>
-      <p>用真实 query 查看关键词、向量和 RRF 融合后的命中结果，判断知识库是否需要补充或调整。</p>
+      <p>用真实查询查看关键词、向量和 RRF 融合后的命中结果，判断知识库是否需要补充或调整。</p>
     </div>
   )
 }
@@ -1763,9 +1807,9 @@ function EmbeddingBlock({
         <span className={embeddedAt ? "pill pill-green" : "pill pill-muted"}>{embeddingLabel(embeddedAt)}</span>
         <span>{formatDate(embeddedAt)}</span>
       </div>
-      <Readonly label="Model" value={model || "-"} />
-      <Readonly label="Version" value={version || "-"} />
-      <Readonly label="Content hash" value={hash || "-"} />
+      <Readonly label="模型" value={model || "-"} />
+      <Readonly label="版本" value={version || "-"} />
+      <Readonly label="内容哈希" value={hash || "-"} />
     </div>
   )
 }
