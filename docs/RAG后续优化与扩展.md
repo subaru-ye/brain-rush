@@ -218,9 +218,9 @@ RRF 融合排序
 
 RRF 的好处是不用过度依赖不同检索器的分数尺度，更适合混合检索。
 
-### 5. 增加检索评估集
+### 5. 继续维护检索评估集
 
-当前主要靠人工看 debug 输出判断检索是否正确。后续需要建立一批固定测试问题。
+当前已经建立固定评估集 `backend/data/rag-eval.json`，并支持 `category`、`byCategory` 和失败案例输出。后续重点不是从零建立评估集，而是继续补充分类 case、保存历史评估结果，并对比不同检索版本。
 
 例如：
 
@@ -231,11 +231,11 @@ Embedding 和 Rerank 有什么区别
 RAG 和微调有什么区别
 ```
 
-每个问题标注应该命中的 chunk/question，然后计算：
+每个问题标注应该命中的 chunk/question，持续观察：
 
-- Recall@5
-- Recall@10
-- MRR
+- top1/top3/top5
+- byCategory 分类命中率
+- failures 中的实际命中和 rank 诊断字段
 
 这样每次改检索逻辑，都能知道效果是变好还是变差。
 
