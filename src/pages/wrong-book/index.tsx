@@ -4,6 +4,7 @@ import Taro, { useLoad } from "@tarojs/taro"
 
 import { ActionButton, Badge, Panel } from "@/components/ui"
 import { getFriendlyErrorMessage } from "@/services/api"
+import { trackEvent } from "@/services/analytics"
 import { loadWrongQuestions, startWrongQuestionReview } from "@/services/wrongBook"
 import type { WrongQuestionItem } from "@/types/learning"
 
@@ -23,6 +24,7 @@ export default function WrongBookPage() {
   const [error, setError] = useState("")
 
   useLoad(() => {
+    void trackEvent("wrong_book_view", { page: "wrong_book" })
     requestWrongQuestions()
   })
 
@@ -40,7 +42,13 @@ export default function WrongBookPage() {
 
   function startReview() {
     if (!items.length) return
-    startWrongQuestionReview(items)
+    const session = startWrongQuestionReview(items)
+    void trackEvent("wrong_review_start", {
+      page: "wrong_book",
+      sessionId: session.sessionId,
+      topic: session.topic,
+      properties: { questionCount: session.questions.length }
+    })
     Taro.navigateTo({ url: "/pages/quiz/index" })
   }
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import Taro, { useLoad } from "@tarojs/taro"
 
+import { trackEvent } from "@/services/analytics"
 import { getCurrentSession, saveCurrentSession } from "@/services/session"
 import type { QuizSession } from "@/types/learning"
 import {
@@ -66,6 +67,20 @@ export function useQuizSession() {
       nextAnswer
     ]
     const nextSession = { ...session, answers }
+    void trackEvent("question_answered", {
+      page: "quiz",
+      sessionId: session.sessionId,
+      topic: session.topic,
+      properties: {
+        questionId: question.id,
+        questionIndex: currentIndex + 1,
+        isCorrect: nextAnswer.isCorrect,
+        elapsedMs: nextAnswer.elapsedMs ?? 0,
+        questionType: getQuestionType(question),
+        sourceType: question.sourceType || "",
+        retrievalVersion: question.retrievalVersion || session.retrievalVersion || ""
+      }
+    })
     setSelectedIndexes(nextAnswer.selectedIndexes || [])
     setAnswered(true)
     setSession(nextSession)

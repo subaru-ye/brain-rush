@@ -9,11 +9,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from .auth import create_auth_token, get_current_user_id, require_admin_token, require_debug_rag_access
+from .auth import (
+    create_auth_token,
+    get_current_user_id,
+    get_optional_user_id,
+    require_admin_token,
+    require_debug_rag_access,
+)
 from .config import Settings, get_settings
 from .database import get_db
 from .embeddings import EmbeddingClient
 from .errors import ApiHttpError
+from .events import save_product_event
 from .feedback import list_wrong_questions, save_question_feedback
 from .history import (
     get_learning_record,
@@ -68,6 +75,8 @@ from .schemas import (
     HistorySaveResponse,
     QuestionFeedbackRequest,
     QuestionFeedbackResponse,
+    ProductEventRequest,
+    ProductEventResponse,
     RagDebugRequest,
     RagDebugResponse,
     RagImportHealthResponse,
@@ -252,6 +261,18 @@ def create_app() -> FastAPI:
         db: Session = Depends(get_db),
     ) -> QuestionFeedbackResponse:
         return save_question_feedback(db, user_id, payload)
+
+    @app.post(
+        "/api/events",
+        response_model=ProductEventResponse,
+        responses={401: {"model": ApiError}},
+    )
+    async def create_product_event(
+        payload: ProductEventRequest,
+        user_id: str | None = Depends(get_optional_user_id),
+        db: Session = Depends(get_db),
+    ) -> ProductEventResponse:
+        return save_product_event(db, user_id, payload)
 
     @app.get(
         "/api/wrong-questions",

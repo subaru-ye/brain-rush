@@ -37,6 +37,7 @@ class User(Base):
 
     records: Mapped[list["LearningRecord"]] = relationship(back_populates="user")
     feedback_items: Mapped[list["QuestionFeedback"]] = relationship(back_populates="user")
+    product_events: Mapped[list["ProductEvent"]] = relationship(back_populates="user")
 
 
 class LearningRecord(Base):
@@ -247,3 +248,29 @@ class QuestionFeedback(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="feedback_items")
+
+
+class ProductEvent(Base):
+    __tablename__ = "product_events"
+    __table_args__ = (
+        Index("ix_product_events_event_created", "event_name", "created_at"),
+        Index("ix_product_events_client_created", "client_id", "created_at"),
+        Index("ix_product_events_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=new_id)
+    user_id: Mapped[str | None] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    client_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    event_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    page: Mapped[str] = mapped_column(String(80), nullable=False)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    topic: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    properties_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    user: Mapped[User | None] = relationship(back_populates="product_events")

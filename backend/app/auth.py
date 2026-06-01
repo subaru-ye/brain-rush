@@ -47,6 +47,20 @@ def get_current_user_id(
     return decode_auth_token(authorization.removeprefix("Bearer ").strip(), settings)
 
 
+def get_optional_user_id(
+    authorization: Annotated[str | None, Header()] = None,
+    settings: Settings = Depends(get_settings),
+) -> str | None:
+    if not authorization:
+        return None
+    if not authorization.startswith("Bearer "):
+        return None
+    try:
+        return decode_auth_token(authorization.removeprefix("Bearer ").strip(), settings)
+    except ApiHttpError:
+        return None
+
+
 def require_admin_token(
     x_admin_token: Annotated[str | None, Header(alias="X-Admin-Token")] = None,
     settings: Settings = Depends(get_settings),

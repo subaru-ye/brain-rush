@@ -74,6 +74,21 @@ export interface AuthSession {
   userId: string
 }
 
+export interface ProductEventRequest {
+  eventName: string
+  clientId: string
+  sessionId?: string
+  topic?: string
+  page: string
+  properties?: Record<string, unknown>
+  occurredAt?: string
+}
+
+export interface ProductEventResponse {
+  id: string
+  createdAt: string
+}
+
 export interface LearningRecordSummary {
   id: string
   sessionId: string

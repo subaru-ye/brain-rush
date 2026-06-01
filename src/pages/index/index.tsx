@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { Text, Textarea, View } from "@tarojs/components"
-import Taro from "@tarojs/taro"
+import Taro, { useLoad } from "@tarojs/taro"
 
 import { ActionButton, Panel } from "@/components/ui"
-import { generateQuiz, getFriendlyErrorMessage } from "@/services/api"
+import { generateQuiz, getFriendlyErrorMessage, isAppError } from "@/services/api"
+import { trackEvent } from "@/services/analytics"
 import { saveCurrentSession } from "@/services/session"
 
 import "./index.css"
@@ -31,6 +32,10 @@ export default function IndexPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
+  useLoad(() => {
+    void trackEvent("home_view", { page: "home" })
+  })
+
   async function handleGenerate() {
     const normalized = inputText.trim()
     if (!normalized) {
@@ -44,8 +49,26 @@ export default function IndexPage() {
 
     setLoading(true)
     setError("")
+    void trackEvent("input_submit", {
+      page: "home",
+      properties: { inputLength: normalized.length }
+    })
+    void trackEvent("quiz_generate_start", {
+      page: "home",
+      properties: { inputLength: normalized.length }
+    })
     try {
       const quiz = await generateQuiz(normalized)
+      void trackEvent("quiz_generate_success", {
+        page: "home",
+        sessionId: quiz.sessionId,
+        topic: quiz.topic,
+        properties: {
+          inputLength: normalized.length,
+          questionCount: quiz.questions.length,
+          retrievalVersion: quiz.retrievalVersion || ""
+        }
+      })
       saveCurrentSession({
         sessionId: quiz.sessionId,
         topic: quiz.topic,
@@ -57,6 +80,13 @@ export default function IndexPage() {
       })
       await Taro.navigateTo({ url: "/pages/quiz/index" })
     } catch (err) {
+      void trackEvent("quiz_generate_failed", {
+        page: "home",
+        properties: {
+          inputLength: normalized.length,
+          errorCode: isAppError(err) ? err.code : "unknown_error"
+        }
+      })
       setError(getFriendlyErrorMessage(err, "题库生成失败，请重试"))
     } finally {
       setLoading(false)
@@ -64,14 +94,20 @@ export default function IndexPage() {
   }
 
   function handleOpenHistory() {
+    void trackEvent("history_click", { page: "home" })
     Taro.navigateTo({ url: "/pages/history/index" })
   }
 
   function handleOpenWrongBook() {
+    void trackEvent("wrong_book_click", { page: "home" })
     Taro.navigateTo({ url: "/pages/wrong-book/index" })
   }
 
-  function handleUseExample(text: string) {
+  function handleUseExample(text: string, source: string) {
+    void trackEvent("example_topic_click", {
+      page: "home",
+      properties: { source, inputLength: text.length }
+    })
     setInputText(text)
     setError("")
   }
@@ -91,7 +127,7 @@ export default function IndexPage() {
         </View>
       </View>
 
-      <View className='sample-card' onClick={() => handleUseExample(activeSample.prompt)}>
+      <View className='sample-card' onClick={() => handleUseExample(activeSample.prompt, "sample_card")}>
         <View className='sample-dot'>
           <View className='sample-dot-core' />
         </View>
@@ -115,7 +151,7 @@ export default function IndexPage() {
 
       <View className='sticker-stack'>
         {examples.map((item) => (
-          <View key={item} className='topic-sticker' onClick={() => handleUseExample(item)}>
+          <View key={item} className='topic-sticker' onClick={() => handleUseExample(item, "topic_sticker")}>
             <Text>{item}</Text>
           </View>
         ))}

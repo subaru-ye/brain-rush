@@ -1,9 +1,10 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Text, View } from "@tarojs/components"
 import Taro from "@tarojs/taro"
 
 import { ActionButton, Badge } from "@/components/ui"
 import { useQuizSession } from "@/hooks/useQuizSession"
+import { trackEvent } from "@/services/analytics"
 import { submitQuestionFeedback } from "@/services/feedback"
 import type { QuestionFeedbackReason } from "@/types/learning"
 import { formatAnswerText, getAnswerIndexes, getQuestionType } from "@/utils/quiz"
@@ -34,6 +35,7 @@ const showRagDebug = process.env.NODE_ENV !== "production"
 
 export default function QuizPage() {
   const [feedbackStatus, setFeedbackStatus] = useState("")
+  const viewedSessionRef = useRef("")
   const {
     session,
     question,
@@ -48,9 +50,36 @@ export default function QuizPage() {
     getOptionClass
   } = useQuizSession()
 
+  useEffect(() => {
+    if (!session || viewedSessionRef.current === session.sessionId) return
+    viewedSessionRef.current = session.sessionId
+    void trackEvent("quiz_view", {
+      page: "quiz",
+      sessionId: session.sessionId,
+      topic: session.topic,
+      properties: {
+        questionCount: session.questions.length,
+        mode: session.mode || "normal",
+        retrievalVersion: session.retrievalVersion || ""
+      }
+    })
+  }, [session])
+
   function handleNext() {
     setFeedbackStatus("")
     if (!goNextQuestion()) {
+      if (session) {
+        void trackEvent("quiz_completed", {
+          page: "quiz",
+          sessionId: session.sessionId,
+          topic: session.topic,
+          properties: {
+            questionCount: session.questions.length,
+            answeredCount: session.answers.length,
+            mode: session.mode || "normal"
+          }
+        })
+      }
       Taro.navigateTo({ url: "/pages/report/index" })
     }
   }

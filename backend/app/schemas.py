@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 from .prompts import QUIZ_PROMPT_VERSION, REPORT_PROMPT_VERSION
 
@@ -193,6 +193,42 @@ class WechatLoginRequest(BaseModel):
 class AuthResponse(BaseModel):
     token: str
     userId: str
+
+
+class ProductEventRequest(BaseModel):
+    eventName: str = Field(min_length=1, max_length=80)
+    clientId: str = Field(min_length=1, max_length=80)
+    sessionId: str | None = Field(default=None, max_length=64)
+    topic: str | None = Field(default=None, max_length=120)
+    page: str = Field(min_length=1, max_length=80)
+    properties: dict[str, Any] = Field(default_factory=dict)
+    occurredAt: datetime | None = None
+
+    @field_validator("eventName", "clientId", "sessionId", "topic", "page")
+    @classmethod
+    def strip_text(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None:
+            return value
+        stripped = value.strip()
+        if not stripped and info.field_name in {"sessionId", "topic"}:
+            return None
+        if not stripped:
+            raise ValueError(f"{info.field_name} cannot be empty")
+        return stripped
+
+    @field_validator("properties", mode="before")
+    @classmethod
+    def normalize_properties(cls, value: object) -> object:
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise ValueError("properties must be an object")
+        return value
+
+
+class ProductEventResponse(BaseModel):
+    id: str
+    createdAt: datetime
 
 
 class HistorySaveRequest(BaseModel):

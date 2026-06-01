@@ -3,7 +3,8 @@ import { Text, View } from "@tarojs/components"
 import Taro, { useLoad } from "@tarojs/taro"
 
 import { ActionButton, Badge } from "@/components/ui"
-import { generateReport, getFriendlyErrorMessage } from "@/services/api"
+import { generateReport, getFriendlyErrorMessage, isAppError } from "@/services/api"
+import { trackEvent } from "@/services/analytics"
 import { submitQuestionFeedback } from "@/services/feedback"
 import { saveLearningRecordToHistory } from "@/services/history"
 import { clearCurrentSession, getCurrentSession, saveCurrentSession } from "@/services/session"
@@ -96,6 +97,16 @@ export default function ReportPage() {
       Taro.redirectTo({ url: "/pages/index/index" })
       return
     }
+    void trackEvent("report_view", {
+      page: "report",
+      sessionId: stored.sessionId,
+      topic: stored.topic,
+      properties: {
+        questionCount: stored.questions.length,
+        answeredCount: stored.answers.length,
+        mode: stored.mode || "normal"
+      }
+    })
     setSession(stored)
     if (stored.report) {
       setReport(stored.report)
@@ -109,6 +120,16 @@ export default function ReportPage() {
     setLoading(true)
     setError("")
     setHistoryNotice("")
+    void trackEvent("report_generate_start", {
+      page: "report",
+      sessionId: nextSession.sessionId,
+      topic: nextSession.topic,
+      properties: {
+        questionCount: nextSession.questions.length,
+        answeredCount: nextSession.answers.length,
+        mode: nextSession.mode || "normal"
+      }
+    })
     try {
       if (nextSession.mode === "wrong_review") {
         const localReport = buildWrongReviewReport(nextSession)
@@ -116,6 +137,16 @@ export default function ReportPage() {
         setReport(localReport)
         setSession(storedSession)
         saveCurrentSession(storedSession)
+        void trackEvent("report_generate_success", {
+          page: "report",
+          sessionId: nextSession.sessionId,
+          topic: nextSession.topic,
+          properties: {
+            mode: "wrong_review",
+            accuracy: localReport.accuracy,
+            wrongCount: localReport.wrongQuestions.length
+          }
+        })
         return
       }
 
@@ -129,12 +160,38 @@ export default function ReportPage() {
       setReport(response.report)
       setSession(storedSession)
       saveCurrentSession(storedSession)
+      void trackEvent("report_generate_success", {
+        page: "report",
+        sessionId: nextSession.sessionId,
+        topic: nextSession.topic,
+        properties: {
+          mode: "normal",
+          accuracy: response.report.accuracy,
+          wrongCount: response.report.wrongQuestions.length,
+          reportPromptVersion: response.reportPromptVersion || "",
+          reportModelName: response.reportModelName || ""
+        }
+      })
       try {
         await saveLearningRecordToHistory(storedSession)
       } catch {
+        void trackEvent("history_save_failed", {
+          page: "report",
+          sessionId: nextSession.sessionId,
+          topic: nextSession.topic
+        })
         setHistoryNotice("报告已生成，但历史记录保存失败，稍后可重新生成报告再保存")
       }
     } catch (err) {
+      void trackEvent("report_generate_failed", {
+        page: "report",
+        sessionId: nextSession.sessionId,
+        topic: nextSession.topic,
+        properties: {
+          mode: nextSession.mode || "normal",
+          errorCode: isAppError(err) ? err.code : "unknown_error"
+        }
+      })
       setError(getFriendlyErrorMessage(err, "报告生成失败，请重试"))
     } finally {
       setLoading(false)
@@ -142,11 +199,25 @@ export default function ReportPage() {
   }
 
   function handleRestart() {
+    if (session) {
+      void trackEvent("restart_click", {
+        page: "report",
+        sessionId: session.sessionId,
+        topic: session.topic
+      })
+    }
     clearCurrentSession()
     Taro.redirectTo({ url: "/pages/index/index" })
   }
 
   function openWrongBook() {
+    if (session) {
+      void trackEvent("wrong_book_from_report_click", {
+        page: "report",
+        sessionId: session.sessionId,
+        topic: session.topic
+      })
+    }
     Taro.navigateTo({ url: "/pages/wrong-book/index" })
   }
 

@@ -5,6 +5,8 @@ import type {
   GenerateReportResponse,
   HistoryListResponse,
   HistorySaveResponse,
+  ProductEventRequest,
+  ProductEventResponse,
   QuestionFeedbackRequest,
   QuestionFeedbackResponse,
   QuizQuestion,
@@ -158,6 +160,13 @@ export function generateReport(
 
 export function loginWithWechat(code: string): Promise<AuthSession> {
   return postJson<AuthSession>("/api/auth/wechat", { code })
+}
+
+export function createProductEvent(
+  payload: ProductEventRequest,
+  token?: string
+): Promise<ProductEventResponse> {
+  return postJson<ProductEventResponse>("/api/events", payload, token ? { token } : {})
 }
 
 export function createHistoryRecord(

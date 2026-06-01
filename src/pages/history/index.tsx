@@ -4,6 +4,7 @@ import Taro, { useLoad } from "@tarojs/taro"
 
 import { ActionButton, Badge, Panel } from "@/components/ui"
 import { getFriendlyErrorMessage } from "@/services/api"
+import { trackEvent } from "@/services/analytics"
 import { loadHistoryRecords } from "@/services/history"
 import type { LearningRecordSummary } from "@/types/learning"
 
@@ -23,6 +24,7 @@ export default function HistoryPage() {
   const [error, setError] = useState("")
 
   useLoad(() => {
+    void trackEvent("history_view", { page: "history" })
     requestRecords()
   })
 
@@ -39,6 +41,16 @@ export default function HistoryPage() {
   }
 
   function openRecord(recordId: string) {
+    const record = records.find((item) => item.id === recordId)
+    void trackEvent("history_record_click", {
+      page: "history",
+      sessionId: record?.sessionId,
+      topic: record?.topic,
+      properties: {
+        recordId,
+        accuracy: record?.accuracy ?? null
+      }
+    })
     Taro.navigateTo({ url: `/pages/history-detail/index?id=${recordId}` })
   }
 
